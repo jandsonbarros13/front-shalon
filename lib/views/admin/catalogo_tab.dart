@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:acaiteria_front/features/auth/services/catalogo_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'form_catalogo_page.dart';
 
 class CatalogoTab extends StatefulWidget {
@@ -31,7 +32,7 @@ class _CatalogoTabState extends State<CatalogoTab> {
 
   @override
   Widget build(BuildContext context) {
-    final String portaAtual = Uri.base.port.toString();
+    final String urlBase = Uri.base.origin;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -63,7 +64,7 @@ class _CatalogoTabState extends State<CatalogoTab> {
                           itemCount: _catalogos.length,
                           itemBuilder: (context, index) {
                             final cat = _catalogos[index];
-                            final url = "http://localhost:$portaAtual/#/catalogo/${cat['chave']}";
+                            final url = "$urlBase/#/catalogo/${cat['chave']}";
 
                             return Card(
                               margin: const EdgeInsets.symmetric(vertical: 8),
@@ -72,7 +73,25 @@ class _CatalogoTabState extends State<CatalogoTab> {
                               child: ListTile(
                                 leading: const Icon(Icons.menu_book, color: Color(0xFF4A0E4E), size: 32),
                                 title: Text(cat['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: SelectableText(url, style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                                subtitle: InkWell(
+                                  onTap: () async {
+                                    final uri = Uri.parse(url);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, webOnlyWindowName: '_blank');
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      url,
+                                      style: const TextStyle(
+                                        color: Colors.blue, 
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
