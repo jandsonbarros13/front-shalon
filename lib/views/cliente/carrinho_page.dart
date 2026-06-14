@@ -6,12 +6,14 @@ class CarrinhoPage extends StatefulWidget {
   final Map<String, dynamic> catalogo;
   final Map<int, double> carrinho;
   final Map<int, String> observacoes;
+  final Map<int, List<int>> adicionaisEscolhidos;
 
   const CarrinhoPage({
     super.key,
     required this.catalogo,
     required this.carrinho,
     required this.observacoes,
+    required this.adicionaisEscolhidos,
   });
 
   @override
@@ -31,16 +33,23 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
     double total = 0.0;
     final produtos = widget.catalogo['produtos'] as List;
     for (var p in produtos) {
-      int id = p['id'];
+      int id = p['id'] ?? p['ID'];
       if (widget.carrinho.containsKey(id)) {
         double qtdOuPeso = widget.carrinho[id]!;
         double precoProduto = double.tryParse(p['price'].toString()) ?? 0.0;
         String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
+        bool isPeso = un == 'kg' || un == 'grama' || un == 'g';
 
-        if (un == 'kg' || un == 'grama' || un == 'g') {
-          total += (precoProduto / 1000.0) * qtdOuPeso;
-        } else {
-          total += precoProduto * qtdOuPeso;
+        total += isPeso ? (precoProduto / 1000.0) * qtdOuPeso : precoProduto * qtdOuPeso;
+
+        if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
+          final escolhas = widget.adicionaisEscolhidos[id]!;
+          for (var ad in p['adicionais']) {
+            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
+              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+              total += precoAd * (isPeso ? 1 : qtdOuPeso);
+            }
+          }
         }
       }
     }
@@ -52,6 +61,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
       if (novaQtd <= 0) {
         widget.carrinho.remove(id);
         widget.observacoes.remove(id);
+        widget.adicionaisEscolhidos.remove(id);
         if (widget.carrinho.isEmpty) {
           Navigator.pop(context);
         }
@@ -69,6 +79,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
           catalogo: widget.catalogo,
           carrinho: widget.carrinho,
           observacoes: widget.observacoes,
+          adicionaisEscolhidos: widget.adicionaisEscolhidos,
           valorTotal: _valorTotal,
         ),
       ),
@@ -87,7 +98,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
     final corLetras = _hexToColor(widget.catalogo['cor_letras'] ?? '#FFFFFF');
     final produtos = widget.catalogo['produtos'] as List;
 
-    final itensNoCarrinho = produtos.where((p) => widget.carrinho.containsKey(p['id'])).toList();
+    final itensNoCarrinho = produtos.where((p) => widget.carrinho.containsKey(p['id'] ?? p['ID'])).toList();
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -138,7 +149,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                         separatorBuilder: (_, __) => Divider(height: isMobile ? 24 : 32),
                         itemBuilder: (context, index) {
                           final p = itensNoCarrinho[index];
-                          int id = p['id'];
+                          int id = p['id'] ?? p['ID'];
                           double qtdOuPeso = widget.carrinho[id]!;
                           String obs = widget.observacoes[id] ?? '';
                           double preco = double.tryParse(p['price'].toString()) ?? 0.0;
@@ -146,6 +157,18 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                           bool isPeso = un == 'kg' || un == 'grama' || un == 'g';
 
                           double subtotalItem = isPeso ? (preco / 1000.0) * qtdOuPeso : preco * qtdOuPeso;
+                          
+                          List<String> nomesAdicionais = [];
+                          if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
+                            final escolhas = widget.adicionaisEscolhidos[id]!;
+                            for (var ad in p['adicionais']) {
+                              if (escolhas.contains(ad['id'] ?? ad['ID'])) {
+                                double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+                                subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
+                                nomesAdicionais.add(ad['name'] ?? '');
+                              }
+                            }
+                          }
 
                           final String urlCompleta = p['image_url'] ?? '';
                           final List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
@@ -178,6 +201,11 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                                           Text(p['name'], style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: corTema), maxLines: 2, overflow: TextOverflow.ellipsis),
                                           const SizedBox(height: 4),
                                           Text(isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.bold)),
+                                          if (nomesAdicionais.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2.0),
+                                              child: Text('+ ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
                                           const SizedBox(height: 4),
                                           Text('R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                                         ],
@@ -244,6 +272,11 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                                     Text(p['name'], style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
                                     const SizedBox(height: 4),
                                     Text(isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)', style: TextStyle(color: Colors.grey[600], fontSize: 14, fontWeight: FontWeight.bold)),
+                                    if (nomesAdicionais.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text('+ ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 13, fontWeight: FontWeight.bold)),
+                                      ),
                                     if (obs.isNotEmpty)
                                       Padding(padding: const EdgeInsets.only(top: 8.0), child: Text('📝 Obs: $obs', style: TextStyle(color: Colors.purple[700], fontSize: 13, fontStyle: FontStyle.italic))),
                                   ],

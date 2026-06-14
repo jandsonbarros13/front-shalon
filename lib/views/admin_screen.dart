@@ -7,6 +7,7 @@ import 'admin/produtos_tab.dart';
 import 'admin/pedidos_tab.dart';
 import 'admin/catalogo_tab.dart';
 import 'admin/usuarios_tab.dart';
+import 'admin/cadastro_frete_page.dart';
 import 'login_screen.dart';
 import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
 
@@ -21,7 +22,6 @@ class _AdminScreenState extends State<AdminScreen> {
   int _abaSelecionada = 0;
   final _pedidoService = PedidoService();
   Timer? _timerGlobal;
-  
   int _ultimoPedidoConhecido = 0;
   bool _isInitialLoad = true;
 
@@ -30,7 +30,8 @@ class _AdminScreenState extends State<AdminScreen> {
     'Controle de Produtos',
     'Pedidos da Loja',
     'Catálogo Digital',
-    'Controle de Usuários'
+    'Controle de Usuários',
+    'Configuração de Frete'
   ];
 
   final List<Widget> _abas = [
@@ -39,6 +40,7 @@ class _AdminScreenState extends State<AdminScreen> {
     const PedidosTab(),
     const CatalogoTab(),
     const UsuariosTab(),
+    const CadastroFretePage(),
   ];
 
   @override
@@ -62,15 +64,16 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _iniciarEscutaGlobalPedidos() {
     _verificarPedidos();
-    
-    _timerGlobal = Timer.periodic(const Duration(seconds: 15), (_) {
+    _timerGlobal = Timer.periodic(const Duration(minutes: 5), (_) {
       _verificarPedidos();
     });
   }
 
   Future<void> _verificarPedidos() async {
     try {
-      final pedidos = await _pedidoService.listarPedidos();
+      final resultado = await _pedidoService.listarPedidos(1);
+      final pedidos = resultado['pedidos'] as List? ?? [];
+      
       if (pedidos.isNotEmpty) {
         int maiorIdAtual = 0;
         int quantidadePendentes = 0;
@@ -87,7 +90,6 @@ class _AdminScreenState extends State<AdminScreen> {
         if (_isInitialLoad) {
           _ultimoPedidoConhecido = maiorIdAtual;
           _isInitialLoad = false;
-          
           if (quantidadePendentes > 0) {
             _executarSomEVibracao();
             _mostrarNotificacaoPendentes(quantidadePendentes);
@@ -113,7 +115,6 @@ class _AdminScreenState extends State<AdminScreen> {
     try {
       final audio = html.AudioElement('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.play();
-      
       Timer(const Duration(seconds: 4), () {
         final audioRepetido = html.AudioElement('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audioRepetido.play();
@@ -123,7 +124,6 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _alertaNovoPedido(int idPedido) {
     _executarSomEVibracao();
-    
     if (html.Notification.supported && html.Notification.permission == 'granted') {
       html.Notification('🍇 NOVO PEDIDO: #$idPedido', body: 'Um novo pedido acabou de cair! Clique para ir para a fila de preparo.');
     }
@@ -198,10 +198,12 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const corTema = Color(0xFF4A0E4E);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titulos[_abaSelecionada], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF4A0E4E),
+        backgroundColor: corTema,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -209,7 +211,7 @@ class _AdminScreenState extends State<AdminScreen> {
         child: Column(
           children: [
             UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF4A0E4E)),
+              decoration: const BoxDecoration(color: corTema),
               currentAccountPicture: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -224,7 +226,7 @@ class _AdminScreenState extends State<AdminScreen> {
               accountEmail: const Text('Painel Administrativo', style: TextStyle(color: Colors.white70)),
             ),
             ListTile(
-              leading: const Icon(Icons.dashboard, color: Color(0xFF4A0E4E)),
+              leading: const Icon(Icons.dashboard, color: corTema),
               title: const Text('Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 0,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
@@ -234,7 +236,7 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.icecream_outlined, color: Color(0xFF4A0E4E)),
+              leading: const Icon(Icons.icecream_outlined, color: corTema),
               title: const Text('Produtos', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 1,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
@@ -244,7 +246,7 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.list_alt, color: Color(0xFF4A0E4E)),
+              leading: const Icon(Icons.list_alt, color: corTema),
               title: const Text('Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 2,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
@@ -254,7 +256,7 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.auto_stories, color: Color(0xFF4A0E4E)),
+              leading: const Icon(Icons.auto_stories, color: corTema),
               title: const Text('Catálogo', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 3,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
@@ -264,12 +266,22 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.people, color: Color(0xFF4A0E4E)),
+              leading: const Icon(Icons.people, color: corTema),
               title: const Text('Usuários', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 4,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
                 setState(() => _abaSelecionada = 4);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.local_shipping, color: corTema),
+              title: const Text('Configurar Frete', style: TextStyle(fontWeight: FontWeight.bold)),
+              selected: _abaSelecionada == 5,
+              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
+              onTap: () {
+                setState(() => _abaSelecionada = 5);
                 Navigator.pop(context);
               },
             ),

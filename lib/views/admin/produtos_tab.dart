@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
 import 'cadastro_produto_page.dart';
@@ -15,8 +16,12 @@ class _ProdutosTabState extends State<ProdutosTab> {
   final _produtoService = ProdutoService();
   final _buscaController = TextEditingController();
   List<dynamic> _produtos = [];
+  int _totalProdutos = 0;
   bool _loading = true;
   int? _hoveredIndex;
+
+  int _paginaAtual = 1;
+  final int _itensPorPagina = 8;
 
   @override
   void initState() {
@@ -24,12 +29,25 @@ class _ProdutosTabState extends State<ProdutosTab> {
     _carregarProdutos();
   }
 
-  Future<void> _carregarProdutos({String nome = ''}) async {
+  Future<void> _carregarProdutos({String nome = '', bool isBusca = false}) async {
+    if (isBusca) _paginaAtual = 1;
     setState(() => _loading = true);
-    final lista = await _produtoService.buscarProdutos(nome: nome);
+    
+    final resultado = await _produtoService.buscarProdutos(_paginaAtual, nome: nome, limit: _itensPorPagina);
+    
+    if (!mounted) return;
+
     setState(() {
-      _produtos = lista;
+      var prods = resultado['produtos'];
+      _produtos = prods is List ? prods : [];
+      _totalProdutos = int.tryParse(resultado['total'].toString()) ?? 0;
       _loading = false;
+
+      int totalPaginas = (_totalProdutos / _itensPorPagina).ceil();
+      if (_paginaAtual > totalPaginas && totalPaginas > 0) {
+        _paginaAtual = totalPaginas;
+        _carregarProdutos(nome: nome);
+      }
     });
   }
 
@@ -38,7 +56,7 @@ class _ProdutosTabState extends State<ProdutosTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Adicionar Estoque - ${produto['name']}', style: const TextStyle(color: Color(0xFF4A0E4E), fontWeight: FontWeight.bold)),
+        title: Text('Adicionar Estoque - ${produto['name'] ?? produto['Name'] ?? ''}', style: const TextStyle(color: Color(0xFF4A0E4E), fontWeight: FontWeight.bold)),
         content: TextField(
           controller: estoqueCtrl,
           keyboardType: TextInputType.number,
@@ -56,8 +74,8 @@ class _ProdutosTabState extends State<ProdutosTab> {
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
             onPressed: () async {
               if (estoqueCtrl.text.isNotEmpty) {
-                int qtdNova = int.parse(estoqueCtrl.text);
-                int qtdAtual = produto['estoque'] ?? 0;
+                int qtdNova = int.tryParse(estoqueCtrl.text) ?? 0;
+                int qtdAtual = int.tryParse((produto['estoque'] ?? produto['Estoque'] ?? 0).toString()) ?? 0;
                 
                 produto['estoque'] = qtdAtual + qtdNova;
                 await _produtoService.editarProduto(produto['id'] ?? produto['ID'], produto);
@@ -92,7 +110,7 @@ class _ProdutosTabState extends State<ProdutosTab> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Excluir Produto?'),
-        content: Text('Tem certeza que deseja remover "${produto['name']}" do cardápio?'),
+        content: Text('Tem certeza que deseja remover "${produto['name'] ?? produto['Name'] ?? ''}" do cardápio?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -112,6 +130,16 @@ class _ProdutosTabState extends State<ProdutosTab> {
         ],
       ),
     );
+  }
+
+  Color _getBadgeColor(String categoria) {
+    switch (categoria) {
+      case 'Adicionais': return Colors.orange[800]!;
+      case 'Produtos': return Colors.teal[700]!;
+      case 'Bebidas': return Colors.blue[700]!;
+      case 'Combos': return Colors.red[700]!;
+      default: return const Color(0xFF4A0E4E);
+    }
   }
 
   Widget _buildHeader(bool isMobile) {
@@ -157,11 +185,11 @@ class _ProdutosTabState extends State<ProdutosTab> {
           icon: const Icon(Icons.clear),
           onPressed: () {
             _buscaController.clear();
-            _carregarProdutos();
+            _carregarProdutos(isBusca: true);
           },
         ),
       ),
-      onChanged: (text) => _carregarProdutos(nome: text),
+      onChanged: (text) => _carregarProdutos(nome: text, isBusca: true),
     );
 
     if (isMobile) {
@@ -192,6 +220,41 @@ class _ProdutosTabState extends State<ProdutosTab> {
     }
   }
 
+  Widget _buildControlePaginacao(int totalPaginas) {
+    if (totalPaginas <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios, size: 20),
+            color: _paginaAtual > 1 ? const Color(0xFF4A0E4E) : Colors.grey[300],
+            onPressed: _paginaAtual > 1 ? () {
+              setState(() => _paginaAtual--);
+              _carregarProdutos(nome: _buscaController.text);
+            } : null,
+          ),
+          const SizedBox(width: 16),
+          Text(
+            'Página $_paginaAtual de $totalPaginas',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800], fontSize: 14),
+          ),
+          const SizedBox(width: 16),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 20),
+            color: _paginaAtual < totalPaginas ? const Color(0xFF4A0E4E) : Colors.grey[300],
+            onPressed: _paginaAtual < totalPaginas ? () {
+              setState(() => _paginaAtual++);
+              _carregarProdutos(nome: _buscaController.text);
+            } : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final larguraTela = MediaQuery.of(context).size.width;
@@ -211,6 +274,9 @@ class _ProdutosTabState extends State<ProdutosTab> {
       proporcaoCard = 1.05;
     }
 
+    int totalPaginas = (_totalProdutos / _itensPorPagina).ceil();
+    if (totalPaginas == 0) totalPaginas = 1;
+
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFFFFD700),
@@ -220,7 +286,7 @@ class _ProdutosTabState extends State<ProdutosTab> {
             MaterialPageRoute(builder: (context) => const CadastroProdutoPage()),
           );
           if (atualizou == true) {
-            _carregarProdutos();
+            _carregarProdutos(nome: _buscaController.text);
           }
         },
         child: const Icon(Icons.add, color: Colors.black),
@@ -236,126 +302,163 @@ class _ProdutosTabState extends State<ProdutosTab> {
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFF4A0E4E)))
                   : _produtos.isEmpty
                       ? const Center(child: Text('Nenhum açaí cadastrado no cardápio.'))
-                      : GridView.builder(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: colunasGrid,
-                            crossAxisSpacing: 20,
-                            mainAxisSpacing: 20,
-                            childAspectRatio: proporcaoCard,
-                          ),
-                          itemCount: _produtos.length,
-                          itemBuilder: (context, index) {
-                            final p = _produtos[index];
-                            final String urlCompleta = p['image_url'] ?? '';
-                            List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
-                            final isHovered = _hoveredIndex == index;
+                      : Column(
+                          children: [
+                            Expanded(
+                              child: GridView.builder(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: colunasGrid,
+                                  crossAxisSpacing: 20,
+                                  mainAxisSpacing: 20,
+                                  childAspectRatio: proporcaoCard,
+                                ),
+                                itemCount: _produtos.length,
+                                itemBuilder: (context, index) {
+                                  final p = _produtos[index];
+                                  final String urlCompleta = (p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '').toString();
+                                  List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
+                                  final isHovered = _hoveredIndex == index;
+                                  final String categoria = (p['category'] ?? p['Category'] ?? 'Produtos').toString();
+                                  final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
+                                  final int estoqueAtual = int.tryParse((p['estoque'] ?? p['Estoque'] ?? 0).toString()) ?? 0;
 
-                            return MouseRegion(
-                              onEnter: (_) => setState(() => _hoveredIndex = index),
-                              onExit: (_) => setState(() => _hoveredIndex = null),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                transform: isHovered && !isMobile
-                                    ? (Matrix4.identity()..translate(0, -6, 0)) 
-                                    : Matrix4.identity(),
-                                child: Card(
-                                  elevation: isHovered && !isMobile ? 12 : 4,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Stack(
+                                  return MouseRegion(
+                                    onEnter: (_) => setState(() => _hoveredIndex = index),
+                                    onExit: (_) => setState(() => _hoveredIndex = null),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      transform: isHovered && !isMobile
+                                          ? (Matrix4.identity()..translate(0, -6, 0)) 
+                                          : Matrix4.identity(),
+                                      child: Card(
+                                        elevation: isHovered && !isMobile ? 12 : 4,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Container(
-                                              width: double.infinity,
-                                              color: const Color(0xFFF5F5F5),
-                                              child: fotos.isEmpty
-                                                  ? const Icon(Icons.icecream, size: 50, color: Color(0xFF4A0E4E))
-                                                  : CarrosselFotosWidget(fotos: fotos),
+                                            Expanded(
+                                              child: Stack(
+                                                children: [
+                                                  Container(
+                                                    width: double.infinity,
+                                                    color: const Color(0xFFF5F5F5),
+                                                    child: fotos.isEmpty
+                                                        ? Center(
+                                                            child: Container(
+                                                              width: 50,
+                                                              height: 50,
+                                                              decoration: const BoxDecoration(
+                                                                shape: BoxShape.circle,
+                                                                image: DecorationImage(
+                                                                  image: AssetImage('assets/images/logo.jpg'),
+                                                                  fit: BoxFit.cover,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          )
+                                                        : CarrosselFotosWidget(fotos: fotos),
+                                                  ),
+                                                  Positioned(
+                                                    top: 8,
+                                                    left: 8,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                      decoration: BoxDecoration(
+                                                        color: _getBadgeColor(categoria),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
+                                                      child: Text(
+                                                        categoria.toUpperCase(),
+                                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    top: 8,
+                                                    right: 8,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFFFD700),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
+                                                      child: Text(
+                                                        'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}',
+                                                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                            Positioned(
-                                              top: 8,
-                                              right: 8,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF4A0E4E),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  'R\$ ${double.parse(p['price'].toString()).toStringAsFixed(2)}',
-                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    p['name']?.toString() ?? '',
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4A0E4E)),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    p['description']?.toString() ?? '',
+                                                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.layers_outlined, size: 14, color: Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Estoque: $estoqueAtual',
+                                                        style: TextStyle(color: Colors.grey[700], fontSize: 11, fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Divider(height: 1, color: Colors.grey[200]),
+                                            Container(
+                                              color: Colors.grey[50],
+                                              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.add_box_outlined, color: Colors.green, size: 20),
+                                                    tooltip: 'Adicionar Estoque',
+                                                    onPressed: () => _abrirDialogEstoque(p),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                                                    tooltip: 'Editar Produto',
+                                                    onPressed: () => _abrirDialogEditar(p),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                                    tooltip: 'Excluir Produto',
+                                                    onPressed: () => _confirmarExclusao(p),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p['name'],
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4A0E4E)),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              p['description'] ?? '',
-                                              style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Row(
-                                              children: [
-                                                Icon(Icons.layers_outlined, size: 14, color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Estoque: ${p['estoque']}',
-                                                  style: TextStyle(color: Colors.grey[700], fontSize: 11, fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Divider(height: 1, color: Colors.grey[200]),
-                                      Container(
-                                        color: Colors.grey[50],
-                                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.add_box_outlined, color: Colors.green, size: 20),
-                                              tooltip: 'Adicionar Estoque',
-                                              onPressed: () => _abrirDialogEstoque(p),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
-                                              tooltip: 'Editar Produto',
-                                              onPressed: () => _abrirDialogEditar(p),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                              tooltip: 'Excluir Produto',
-                                              onPressed: () => _confirmarExclusao(p),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
+                            ),
+                            _buildControlePaginacao(totalPaginas),
+                          ],
                         ),
             ),
           ],
@@ -377,24 +480,49 @@ class _CarrosselFotosWidgetState extends State<CarrosselFotosWidget> {
   final PageController _pageController = PageController();
   Timer? _timer;
   int _currentPage = 0;
+  final List<Uint8List> _cachedBytes = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.fotos.length > 1) {
-      _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-        if (_pageController.hasClients) {
-          _currentPage++;
-          if (_currentPage >= widget.fotos.length) {
-            _currentPage = 0;
-          }
-          _pageController.animateToPage(
-            _currentPage,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
+    _processarEPrevinirPisca();
+  }
+
+  void _processarEPrevinirPisca() {
+    for (var f in widget.fotos) {
+      String foto = f;
+      if (foto.contains(',')) foto = foto.split(',')[1];
+      foto = foto.replaceAll('\n', '').replaceAll('\r', '').trim();
+      try {
+        _cachedBytes.add(base64Decode(foto));
+      } catch (_) {}
+    }
+  }
+
+  void _iniciarCarrossel() {
+    if (_cachedBytes.length <= 1) return;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (mounted && _pageController.hasClients) {
+        _currentPage++;
+        if (_currentPage >= _cachedBytes.length) {
+          _currentPage = 0;
         }
-      });
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  void _pararCarrossel() {
+    _timer?.cancel();
+    _timer = null;
+    if (mounted && _pageController.hasClients && _currentPage != 0) {
+      _currentPage = 0;
+      _pageController.jumpToPage(0);
     }
   }
 
@@ -407,17 +535,35 @@ class _CarrosselFotosWidgetState extends State<CarrosselFotosWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: widget.fotos.length,
-      onPageChanged: (index) => _currentPage = index,
-      itemBuilder: (context, index) {
-        final String foto = widget.fotos[index];
-        final bool isBase64 = foto.startsWith('data:image');
-        return isBase64
-            ? Image.memory(foto.contains(',') ? base64Decode(foto.split(',')[1]) : base64Decode(foto), fit: BoxFit.contain)
-            : Image.network(foto, fit: BoxFit.contain);
-      },
+    if (_cachedBytes.isEmpty) {
+      return const Center(child: Icon(Icons.broken_image, color: Colors.grey));
+    }
+
+    if (_cachedBytes.length == 1) {
+      return Image.memory(_cachedBytes.first, fit: BoxFit.cover, gaplessPlayback: true);
+    }
+
+    return MouseRegion(
+      onEnter: (_) => _iniciarCarrossel(),
+      onExit: (_) => _pararCarrossel(),
+      child: GestureDetector(
+        onTapDown: (_) => _iniciarCarrossel(),
+        onTapUp: (_) => _pararCarrossel(),
+        onTapCancel: () => _pararCarrossel(),
+        child: PageView.builder(
+          controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _cachedBytes.length,
+          onPageChanged: (index) => _currentPage = index,
+          itemBuilder: (context, index) {
+            return Image.memory(
+              _cachedBytes[index], 
+              fit: BoxFit.cover, 
+              gaplessPlayback: true,
+            );
+          },
+        ),
+      ),
     );
   }
 }

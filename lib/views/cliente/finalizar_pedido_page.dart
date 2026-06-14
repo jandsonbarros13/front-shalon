@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
+import 'package:acaiteria_front/features/auth/services/frete_service.dart';
 
 class FinalizarPedidoPage extends StatefulWidget {
   final Map<String, dynamic> catalogo;
   final Map<int, double> carrinho;
   final Map<int, String> observacoes;
+  final Map<int, List<int>> adicionaisEscolhidos;
   final double valorTotal;
 
   const FinalizarPedidoPage({
@@ -16,6 +19,7 @@ class FinalizarPedidoPage extends StatefulWidget {
     required this.catalogo,
     required this.carrinho,
     required this.observacoes,
+    required this.adicionaisEscolhidos,
     required this.valorTotal,
   });
 
@@ -26,15 +30,19 @@ class FinalizarPedidoPage extends StatefulWidget {
 class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   final _formKey = GlobalKey<FormState>();
   final _pedidoService = PedidoService();
+  final _freteService = FreteService();
   
   final _nomeController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _cepController = TextEditingController();
   final _ruaController = TextEditingController();
   final _numeroController = TextEditingController();
-  final _bairroController = TextEditingController();
   final _referenciaController = TextEditingController();
   final _trocoController = TextEditingController();
+
+  List<dynamic> _bairrosAtivos = [];
+  String? _bairroSelecionado;
+  double _taxaEntrega = 0.0;
 
   String _tipoEntrega = 'Entrega'; 
   String _formaPagamento = 'Pix'; 
@@ -42,11 +50,12 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   bool _isSaving = false;
   bool _isCarregandoLocalizacao = false;
   bool _isCarregandoCep = false;
+  bool _isCarregandoFretes = true;
 
   @override
   void initState() {
     super.initState();
-    _recuperarDadosCache();
+    _carregarBairrosEFretes().then((_) => _recuperarDadosCache());
   }
 
   @override
@@ -56,10 +65,23 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     _cepController.dispose();
     _ruaController.dispose();
     _numeroController.dispose();
-    _bairroController.dispose();
     _referenciaController.dispose();
     _trocoController.dispose();
     super.dispose();
+  }
+
+  double get _valorTotalComFrete {
+    return widget.valorTotal + (_tipoEntrega == 'Entrega' ? _taxaEntrega : 0.0);
+  }
+
+  Future<void> _carregarBairrosEFretes() async {
+    final dados = await _freteService.listarFretesDoBanco();
+    if (mounted) {
+      setState(() {
+        _bairrosAtivos = dados.where((b) => b['ativo'] == true).toList();
+        _isCarregandoFretes = false;
+      });
+    }
   }
 
   Future<void> _recuperarDadosCache() async {
@@ -70,10 +92,14 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
       _cepController.text = prefs.getString('cache_cep') ?? '';
       _ruaController.text = prefs.getString('cache_rua') ?? '';
       _numeroController.text = prefs.getString('cache_numero') ?? '';
-      _bairroController.text = prefs.getString('cache_bairro') ?? '';
       _referenciaController.text = prefs.getString('cache_referencia') ?? '';
       _tipoEntrega = prefs.getString('cache_tipo_entrega') ?? 'Entrega';
       _formaPagamento = prefs.getString('cache_forma_pagamento') ?? 'Pix';
+      
+      String bairroCache = prefs.getString('cache_bairro') ?? '';
+      if (bairroCache.isNotEmpty) {
+        _tentarMatchDeBairro(bairroCache);
+      }
     });
   }
 
@@ -84,53 +110,56 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     await prefs.setString('cache_cep', _cepController.text.trim());
     await prefs.setString('cache_rua', _ruaController.text.trim());
     await prefs.setString('cache_numero', _numeroController.text.trim());
-    await prefs.setString('cache_bairro', _bairroController.text.trim());
+    await prefs.setString('cache_bairro', _bairroSelecionado ?? '');
     await prefs.setString('cache_referencia', _referenciaController.text.trim());
     await prefs.setString('cache_tipo_entrega', _tipoEntrega);
     await prefs.setString('cache_forma_pagamento', _formaPagamento);
   }
 
+  void _tentarMatchDeBairro(String nomeBairroEncontrado) {
+    String limpo = nomeBairroEncontrado.trim().toLowerCase();
+    final match = _bairrosAtivos.firstWhere(
+      (b) => b['bairro'].toString().toLowerCase().contains(limpo) || limpo.contains(b['bairro'].toString().toLowerCase()),
+      orElse: () => null,
+    );
+
+    if (match != null) {
+      setState(() {
+        _bairroSelecionado = match['bairro'];
+        _taxaEntrega = double.tryParse(match['taxa'].toString()) ?? 0.0;
+      });
+    }
+  }
+
   Future<void> _buscarCep(String cep) async {
     String cepLimpo = cep.replaceAll(RegExp(r'\D'), '');
     if (cepLimpo.length != 8) {
-      _mostrarAviso('Digite um CEP válido com 8 dígitos.');
       return;
     }
-
     setState(() => _isCarregandoCep = true);
-
     try {
       final url = Uri.parse('https://viacep.com.br/ws/$cepLimpo/json/');
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
         final dados = jsonDecode(response.body);
-        if (dados['erro'] == true) {
-          _mostrarAviso('CEP não encontrado.');
-          return;
-        }
-
+        if (dados['erro'] == true) return;
         setState(() {
           _ruaController.text = dados['logradouro'] ?? '';
-          _bairroController.text = dados['bairro'] ?? '';
         });
+        if (dados['bairro'] != null) {
+          _tentarMatchDeBairro(dados['bairro']);
+        }
         await _salvarDadosCache();
       }
     } catch (_) {
-      _mostrarAviso('Erro ao buscar o CEP. Digite o endereço manualmente.');
     } finally {
       setState(() => _isCarregandoCep = false);
     }
   }
 
   Future<void> _obterLocalizacaoAtual() async {
-    if (html.window.navigator.geolocation == null) {
-      _mostrarAviso('Geolocalização não é suportada pelo seu navegador.');
-      return;
-    }
-
+    if (html.window.navigator.geolocation == null) return;
     setState(() => _isCarregandoLocalizacao = true);
-
     try {
       final position = await html.window.navigator.geolocation.getCurrentPosition();
       final coords = position.coords;
@@ -138,11 +167,9 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
         await _buscarEnderecoPorCoordenadas(coords.latitude as double, coords.longitude as double);
       } else {
         setState(() => _isCarregandoLocalizacao = false);
-        _mostrarAviso('Não foi possível obter as coordenadas.');
       }
     } catch (_) {
       setState(() => _isCarregandoLocalizacao = false);
-      _mostrarAviso('Permissão de localização negada ou indisponível.');
     }
   }
 
@@ -150,24 +177,24 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     try {
       final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1');
       final response = await http.get(url, headers: {'User-Agent': 'AcaiteriaShalomApp'});
-
       if (response.statusCode == 200) {
         final dados = jsonDecode(response.body);
         final address = dados['address'];
-
         if (address != null) {
           setState(() {
             _ruaController.text = address['road'] ?? address['pedestrian'] ?? '';
-            _bairroController.text = address['suburb'] ?? address['neighbourhood'] ?? address['village'] ?? '';
             _numeroController.text = address['house_number'] ?? '';
             String cepBruto = address['postcode'] ?? '';
             _cepController.text = cepBruto.replaceAll(RegExp(r'\D'), '');
           });
+          String bairroBuscado = address['suburb'] ?? address['neighbourhood'] ?? address['village'] ?? '';
+          if (bairroBuscado.isNotEmpty) {
+            _tentarMatchDeBairro(bairroBuscado);
+          }
           await _salvarDadosCache();
         }
       }
     } catch (e) {
-      print(e);
     } finally {
       setState(() => _isCarregandoLocalizacao = false);
     }
@@ -177,18 +204,225 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     html.window.open('https://buscacepinter.correios.com.br/app/endereco/index.php', '_blank');
   }
 
-  void _mostrarAviso(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensagem), backgroundColor: Colors.orange),
-    );
-  }
-
   Color _hexToColor(String hex) {
     try {
       return Color(int.parse(hex.replaceFirst('#', '0xFF')));
     } catch (_) {
       return const Color(0xFF4A0E4E);
     }
+  }
+
+  String _gerarDetalhesItensHTML() {
+    final produtos = widget.catalogo['produtos'] as List;
+    String htmlItens = "";
+
+    for (var p in produtos) {
+      int id = p['id'] ?? p['ID'];
+      if (widget.carrinho.containsKey(id)) {
+        double qtd = widget.carrinho[id]!;
+        String obs = widget.observacoes[id] ?? '';
+        double preco = double.tryParse(p['price'].toString()) ?? 0.0;
+        String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
+        bool isPeso = un == 'kg' || un == 'grama' || un == 'g';
+        
+        double subtotalItem = isPeso ? (preco / 1000.0) * qtd : preco * qtd;
+
+        String nomeAdicionaisFormatados = '';
+        if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
+          final escolhas = widget.adicionaisEscolhidos[id]!;
+          List<String> nomesAds = [];
+          for (var ad in p['adicionais']) {
+            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
+              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+              subtotalItem += precoAd * (isPeso ? 1 : qtd);
+              nomesAds.add(ad['name'] ?? '');
+            }
+          }
+          if (nomesAds.isNotEmpty) {
+            nomeAdicionaisFormatados = ' (+ ${nomesAds.join(', ')})';
+          }
+        }
+
+        String qtdText = isPeso ? '${qtd.toInt()}g' : '${qtd.toInt()} un';
+        htmlItens += '''
+          <div class="item">
+            <span>$qtdText x ${p['name']} $nomeAdicionaisFormatados</span>
+            <span>R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}</span>
+          </div>
+        ''';
+        if (obs.isNotEmpty) {
+          htmlItens += '<div class="obs">Obs: $obs</div>';
+        }
+      }
+    }
+    return htmlItens;
+  }
+
+  Future<void> _gerarPdfRecibo(int idPedido) async {
+    String base64Logo = "";
+    try {
+      final ByteData bytes = await rootBundle.load('assets/images/logo.jpg');
+      base64Logo = base64Encode(bytes.buffer.asUint8List());
+    } catch (_) {}
+
+    String logoHtml = base64Logo.isNotEmpty 
+        ? '<img src="data:image/jpeg;base64,$base64Logo" class="logo">' 
+        : '';
+
+    String htmlContent = '''
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Recibo #$idPedido - Açaiteria Shalom</title>
+      <style>
+        body { font-family: 'Courier New', Courier, monospace; max-width: 380px; margin: 0 auto; padding: 20px; color: #000; background: #fff;}
+        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 15px; margin-bottom: 15px; }
+        .header h2 { margin: 10px 0 5px 0; font-size: 20px; font-weight: bold; }
+        .header p { margin: 3px 0; font-size: 13px; color: #222; }
+        .logo { width: 75px; height: 75px; border-radius: 50%; object-fit: cover; filter: grayscale(100%); margin-bottom: 5px; }
+        .info { margin-bottom: 20px; font-size: 14px; line-height: 1.6; border-bottom: 1px dashed #000; padding-bottom: 15px;}
+        .item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: bold;}
+        .obs { font-size: 12px; color: #444; margin-bottom: 12px; padding-left: 10px; font-style: italic;}
+        .total { border-top: 1px dashed #000; padding-top: 15px; font-weight: bold; font-size: 18px; margin-top: 15px; display: flex; justify-content: space-between;}
+        .taxa { display: flex; justify-content: space-between; font-size: 14px; margin-top: 10px; color: #333;}
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #555; border-top: 1px dashed #000; padding-top: 15px;}
+        @media print { 
+          body { width: 100%; margin: 0; padding: 0; max-width: 100%; } 
+        }
+      </style>
+    </head>
+    <body onload="window.print()">
+      <div class="header">
+        $logoHtml
+        <h2>AÇAITERIA SHALOM</h2>
+        <p>Rua Josias Gondim - 711</p>
+        <p>Santa Clara, Canindé - CE</p>
+        <p>WhatsApp: (85) 99999-9999</p>
+        <p>Insta: @acaiteriashalom2026</p>
+      </div>
+
+      <div class="info">
+        <b>PEDIDO Nº:</b> #$idPedido<br>
+        <b>CLIENTE:</b> ${_nomeController.text.trim()}<br>
+        <b>FONE:</b> ${_telefoneController.text.trim()}<br>
+        <b>ENTREGA:</b> $_tipoEntrega<br>
+        <b>PAGAMENTO:</b> $_formaPagamento
+      </div>
+      
+      <div style="font-weight: bold; margin-bottom: 15px; text-align: center; font-size: 15px;">ITENS DO PEDIDO</div>
+      
+      ${_gerarDetalhesItensHTML()}
+      
+      <div class="taxa">
+        <span>Subtotal:</span>
+        <span>R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}</span>
+      </div>
+      
+      <div class="taxa">
+        <span>Taxa de Entrega:</span>
+        <span>R\$ ${_tipoEntrega == 'Entrega' ? _taxaEntrega.toStringAsFixed(2).replaceAll('.', ',') : '0,00'}</span>
+      </div>
+
+      <div class="total">
+        <span>TOTAL:</span>
+        <span>R\$ ${_valorTotalComFrete.toStringAsFixed(2).replaceAll('.', ',')}</span>
+      </div>
+      
+      <div class="footer">
+        <b>Obrigado pela preferência!</b><br><br>
+        Acesse nosso app para pedir novamente.<br>
+        <i>Desenvolvido por Pedro Barros</i>
+      </div>
+    </body>
+    </html>
+    ''';
+    
+    final blob = html.Blob([htmlContent], 'text/html; charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+  }
+
+  void _enviarWhatsApp(int idPedido) {
+    String numeroDestino = '5585999999999';
+    String mensagem = 'Olá! Gostaria de acompanhar meu pedido *#$idPedido* feito pelo aplicativo.\n\nNome: ${_nomeController.text.trim()}';
+    String urlSmart = 'https://wa.me/$numeroDestino?text=${Uri.encodeComponent(mensagem)}';
+    html.window.open(urlSmart, '_blank');
+  }
+
+  void _mostrarModalSucesso(int idPedido, Color corTema) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 450),
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 90, height: 90,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle, 
+                  image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text('Pedido Realizado!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.green)),
+              const SizedBox(height: 8),
+              Text('Seu pedido nº #$idPedido', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
+              const SizedBox(height: 24),
+              const Text(
+                'O seu pedido já foi recebido em nosso painel administrativo e está sendo preparado com muito carinho para você.', 
+                textAlign: TextAlign.center, 
+                style: TextStyle(color: Colors.black87, height: 1.5, fontSize: 14)
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: corTema, 
+                    side: BorderSide(color: corTema, width: 1.5), 
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  onPressed: () => _gerarPdfRecibo(idPedido),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Ver Recibo do Pedido (PDF)', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366), 
+                    foregroundColor: Colors.white, 
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  onPressed: () => _enviarWhatsApp(idPedido),
+                  icon: const Icon(Icons.chat),
+                  label: const Text('Dúvidas? Fale no WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); 
+                  Navigator.pop(context, true); 
+                },
+                child: const Text('VOLTAR AO CATÁLOGO', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w900)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _processarPedido(Color corTema) async {
@@ -201,21 +435,38 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     final produtos = widget.catalogo['produtos'] as List;
 
     for (var p in produtos) {
-      int id = p['id'];
+      int id = p['id'] ?? p['ID'];
       if (widget.carrinho.containsKey(id)) {
         double qtd = widget.carrinho[id]!;
         String obs = widget.observacoes[id] ?? '';
         double preco = double.tryParse(p['price'].toString()) ?? 0.0;
         String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
+        bool isPeso = un == 'kg' || un == 'grama' || un == 'g';
         
-        double subtotalItem = (un == 'kg' || un == 'grama' || un == 'g') ? (preco / 1000.0) * qtd : preco * qtd;
+        double subtotalItem = isPeso ? (preco / 1000.0) * qtd : preco * qtd;
+
+        String nomeAdicionaisFormatados = '';
+        if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
+          final escolhas = widget.adicionaisEscolhidos[id]!;
+          List<String> nomesAds = [];
+          for (var ad in p['adicionais']) {
+            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
+              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+              subtotalItem += precoAd * (isPeso ? 1 : qtd);
+              nomesAds.add(ad['name'] ?? '');
+            }
+          }
+          if (nomesAds.isNotEmpty) {
+            nomeAdicionaisFormatados = ' (+ ${nomesAds.join(', ')})';
+          }
+        }
 
         itensDb.add({
           'produto_id': id,
           'quantidade': qtd,
           'subtotal': subtotalItem,
           'unidade': un,
-          'nome': p['name'] + (obs.isNotEmpty ? ' (Obs: $obs)' : ''),
+          'nome': (p['name'] ?? '') + nomeAdicionaisFormatados + (obs.isNotEmpty ? ' (Obs: $obs)' : ''),
         });
       }
     }
@@ -226,11 +477,12 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
       'tipo_entrega': _tipoEntrega,
       'endereco_rua': _tipoEntrega == 'Entrega' ? _ruaController.text.trim() : '',
       'endereco_numero': _tipoEntrega == 'Entrega' ? _numeroController.text.trim() : '',
-      'endereco_bairro': _tipoEntrega == 'Entrega' ? _bairroController.text.trim() : '',
+      'endereco_bairro': _tipoEntrega == 'Entrega' ? (_bairroSelecionado ?? '') : '',
       'endereco_referencia': _tipoEntrega == 'Entrega' ? _referenciaController.text.trim() : '',
       'forma_pagamento': _formaPagamento,
       'troco_para': double.tryParse(_trocoController.text.replaceAll(',', '.')) ?? 0.0,
-      'valor_total': widget.valorTotal,
+      'taxa_entrega': _tipoEntrega == 'Entrega' ? _taxaEntrega : 0.0,
+      'valor_total': _valorTotalComFrete,
       'itens': itensDb,
     };
 
@@ -241,65 +493,12 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
 
     if (resultado['success'] == true) {
       int idPedidoBanco = resultado['pedido_id'] ?? 0;
-      
-      StringBuffer mensagem = StringBuffer();
-      mensagem.writeln('🍇 *NOVO PEDIDO - AÇAITERIA SHALOM* 🍇');
-      mensagem.writeln('\n📋 *Pedido Nº:* #$idPedidoBanco');
-      mensagem.writeln('\n👤 *Cliente:* ${_nomeController.text.trim()}');
-      mensagem.writeln('📞 *Telefone:* ${_telefoneController.text.trim()}');
-      mensagem.writeln('\n🛵 *Forma de Entrega:* $_tipoEntrega');
-      
-      if (_tipoEntrega == 'Entrega') {
-        if (_cepController.text.isNotEmpty) {
-          mensagem.writeln('📮 *CEP:* ${_cepController.text.trim()}');
-        }
-        mensagem.writeln('📍 *Endereço:* Rua ${_ruaController.text.trim()}, Nº ${_numeroController.text.trim()}');
-        mensagem.writeln('🏘️ *Bairro:* ${_bairroController.text.trim()}');
-        if (_referenciaController.text.isNotEmpty) {
-          mensagem.writeln('📌 *Referência:* ${_referenciaController.text.trim()}');
-        }
-      }
-
-      mensagem.writeln('\n🛒 *ITENS DO PEDIDO:*');
-      for (var p in produtos) {
-        int id = p['id'];
-        if (widget.carrinho.containsKey(id)) {
-          String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
-          double qtd = widget.carrinho[id]!;
-          String obs = widget.observacoes[id] ?? '';
-
-          if (un == 'kg' || un == 'grama' || un == 'g') {
-            mensagem.writeln('• ${p['name']} (${qtd.toInt()}g)');
-          } else {
-            mensagem.writeln('• ${qtd.toInt()}x ${p['name']}');
-          }
-          if (obs.isNotEmpty) {
-            mensagem.writeln('   📝 Obs: $obs');
-          }
-        }
-      }
-
-      mensagem.writeln('\n💳 *Forma de Pagamento:* $_formaPagamento');
-      if (_formaPagamento == 'Dinheiro' && _precisaTroco) {
-        mensagem.writeln('💵 *Troco para:* R\$ ${_trocoController.text.trim()}');
-      }
-      mensagem.writeln('\n💰 *TOTAL DO PEDIDO:* R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}');
-
-      String textoFormatado = Uri.encodeComponent(mensagem.toString());
-      String numeroDestino = _telefoneController.text.trim().replaceAll(RegExp(r'[^\d]'), '');
-      
-      if (!numeroDestino.startsWith('55') && numeroDestino.isNotEmpty) {
-        numeroDestino = '55$numeroDestino';
-      }
-
-      String urlSmart = 'https://wa.me/$numeroDestino?text=$textoFormatado';
-      html.window.open(urlSmart, '_blank');
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pedido enviado com sucesso!'), backgroundColor: Colors.green));
-      Navigator.pop(context, true);
-
+      _mostrarModalSucesso(idPedidoBanco, corTema);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao processar pedido. Tente novamente.'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erro ao processar pedido. Tente novamente.'), 
+        backgroundColor: Colors.red
+      ));
     }
   }
 
@@ -368,8 +567,8 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
                       elevation: 4,
                     ),
                     onPressed: _isSaving ? null : () => _processarPedido(corTema),
-                    icon: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.send, size: isMobile ? 20 : 28),
-                    label: Text(_isSaving ? 'PROCESSANDO...' : 'ENVIAR PEDIDO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 14 : 18, letterSpacing: 1)),
+                    icon: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.check_circle, size: isMobile ? 20 : 28),
+                    label: Text(_isSaving ? 'PROCESSANDO...' : 'FINALIZAR PEDIDO (R\$ ${_valorTotalComFrete.toStringAsFixed(2).replaceAll('.', ',')})', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 14 : 16, letterSpacing: 1)),
                   ),
                 ),
                 if (isMobile) const SizedBox(height: 24),
@@ -516,12 +715,32 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _bairroController,
-                onChanged: (_) => _salvarDadosCache(),
-                decoration: InputDecoration(labelText: 'Bairro', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-                validator: (v) => _tipoEntrega == 'Entrega' && v!.isEmpty ? 'Por favor, informe o bairro' : null,
-              ),
+              
+              _isCarregandoFretes 
+                  ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                  : DropdownButtonFormField<String>(
+                      value: _bairroSelecionado,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: 'Bairro', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                      validator: (v) => _tipoEntrega == 'Entrega' && v == null ? 'Por favor, selecione seu bairro' : null,
+                      items: _bairrosAtivos.map((b) {
+                        final taxa = double.tryParse(b['taxa'].toString()) ?? 0.0;
+                        final taxaStr = taxa == 0.0 ? 'Entrega Grátis' : 'Taxa: R\$ ${taxa.toStringAsFixed(2).replaceAll('.', ',')}';
+                        return DropdownMenuItem<String>(
+                          value: b['bairro'],
+                          child: Text('${b['bairro']} - $taxaStr', style: TextStyle(fontSize: isMobile ? 14 : 16)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _bairroSelecionado = val;
+                          final match = _bairrosAtivos.firstWhere((b) => b['bairro'] == val);
+                          _taxaEntrega = double.tryParse(match['taxa'].toString()) ?? 0.0;
+                        });
+                        _salvarDadosCache();
+                      },
+                    ),
+              
               const SizedBox(height: 16),
               TextFormField(
                 controller: _referenciaController,
@@ -585,7 +804,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
               separatorBuilder: (_, __) => const Divider(),
               itemBuilder: (context, index) {
                 final p = produtos[index];
-                int id = p['id'];
+                int id = p['id'] ?? p['ID'];
                 
                 if (!widget.carrinho.containsKey(id)) return const SizedBox.shrink();
 
@@ -597,6 +816,18 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
 
                 double subtotalItem = isPeso ? (preco / 1000.0) * qtdOuPeso : preco * qtdOuPeso;
 
+                List<String> nomesAdicionais = [];
+                if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
+                  final escolhas = widget.adicionaisEscolhidos[id]!;
+                  for (var ad in p['adicionais']) {
+                    if (escolhas.contains(ad['id'] ?? ad['ID'])) {
+                      double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+                      subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
+                      nomesAdicionais.add(ad['name'] ?? '');
+                    }
+                  }
+                }
+
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Row(
@@ -606,11 +837,16 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            Text(p['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             Text(
                               isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)',
                               style: const TextStyle(color: Colors.grey, fontSize: 13),
                             ),
+                            if (nomesAdicionais.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text('+ ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
                             if (obs.isNotEmpty)
                               Text('📝 Obs: $obs', style: TextStyle(color: Colors.purple[700], fontSize: 12, fontStyle: FontStyle.italic)),
                           ],
@@ -624,11 +860,33 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
               },
             ),
             const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Divider()),
+            
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Subtotal dos Itens', style: TextStyle(fontSize: isMobile ? 14 : 16)),
+                Text('R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            if (_tipoEntrega == 'Entrega')
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Taxa de Entrega', style: TextStyle(fontSize: isMobile ? 14 : 16)),
+                    Text('R\$ ${_taxaEntrega.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.bold, color: Colors.red)),
+                  ],
+                ),
+              ),
+            
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12.0), child: Divider()),
+            
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 16 : 20)),
-                Text('R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 22 : 24, color: corTema)),
+                Text('R\$ ${_valorTotalComFrete.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 22 : 24, color: corTema)),
               ],
             )
           ],

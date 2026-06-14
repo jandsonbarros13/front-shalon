@@ -28,8 +28,17 @@ class PedidoService {
     }
   }
 
-  Future<List<dynamic>> listarPedidos() async {
-    final url = Uri.parse('$_urlBaseLimpa/api/pedidos');
+  // 👇 A MÁGICA ESTÁ NESTA LINHA AQUI! O parâmetro "limit" foi adicionado.
+  Future<Map<String, dynamic>> listarPedidos(int pagina, {String? dataInicio, String? dataFim, int limit = 10}) async {
+    String queryParams = 'page=$pagina&limit=$limit';
+    if (dataInicio != null && dataInicio.isNotEmpty) {
+      queryParams += '&data_inicio=$dataInicio';
+    }
+    if (dataFim != null && dataFim.isNotEmpty) {
+      queryParams += '&data_fim=$dataFim';
+    }
+
+    final url = Uri.parse('$_urlBaseLimpa/api/pedidos?$queryParams');
     try {
       final response = await http.get(
         url,
@@ -40,7 +49,7 @@ class PedidoService {
         return jsonDecode(response.body);
       }
     } catch (_) {}
-    return [];
+    return {'pedidos': [], 'total': 0};
   }
 
   Future<bool> atualizarStatus(int id, String novoStatus) async {

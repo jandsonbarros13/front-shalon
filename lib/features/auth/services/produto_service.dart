@@ -1,7 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import '../../../core/constants/api_constants.dart';
+import 'package:acaiteria_front/core/constants/api_constants.dart';
 
 class ProdutoService {
   final Map<String, String> _headers = {
@@ -9,15 +9,37 @@ class ProdutoService {
     'Accept': 'application/json',
   };
 
-  Future<List<dynamic>> buscarProdutos({String nome = ''}) async {
-    final url = Uri.parse('${ApiConstants.produtos}?nome=$nome');
+  Future<Map<String, dynamic>> buscarProdutos(int pagina, {String nome = '', int limit = 8}) async {
+    final url = Uri.parse('${ApiConstants.produtos}?page=$pagina&limit=$limit&nome=$nome');
     try {
-      final response = await http.get(url, headers: _headers).timeout(const Duration(seconds: 60));
+      // REMOVI O TIMEOUT! Imagens em Base64 pesam muito (seu print marcou 12.5MB). 
+      // Deixe o Flutter pensar o tempo que precisar.
+      final response = await http.get(url, headers: _headers);
+      
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        
+        if (decoded is Map) {
+          return {
+            'produtos': decoded['produtos'] is List ? decoded['produtos'] : [],
+            'total': decoded['total'] ?? 0,
+          };
+        } else if (decoded is List) {
+          return {
+            'produtos': decoded,
+            'total': decoded.length,
+          };
+        }
+      } else {
+        print("Erro na resposta do Servidor Go: Status ${response.statusCode}");
       }
-    } catch (_) {}
-    return [];
+    } catch (e, stacktrace) {
+      // SE AINDA FICAR BRANCO, OLHE A ABA "CONSOLE" NO GOOGLE CHROME!
+      print("🚨 ERRO CRÍTICO AO LER OS PRODUTOS: $e");
+      print(stacktrace);
+    }
+    
+    return {'produtos': [], 'total': 0};
   }
 
   Future<Map<String, dynamic>> cadastrarProduto(Map<String, dynamic> dados) async {
@@ -27,10 +49,8 @@ class ProdutoService {
         url,
         headers: _headers,
         body: jsonEncode(dados),
-      ).timeout(const Duration(seconds: 60));
+      );
       return jsonDecode(response.body);
-    } on TimeoutException {
-      return {'success': false, 'message': 'Tempo limite excedido. Imagem muito pesada?'};
     } catch (e) {
       return {'success': false, 'message': 'Erro ao conectar ao servidor Go.'};
     }
@@ -43,7 +63,7 @@ class ProdutoService {
         url,
         headers: _headers,
         body: jsonEncode(dados),
-      ).timeout(const Duration(seconds: 60));
+      );
       if (response.body.isNotEmpty) {
         return jsonDecode(response.body);
       }
@@ -54,7 +74,7 @@ class ProdutoService {
   Future<Map<String, dynamic>> deletarProduto(int id) async {
     final url = Uri.parse('${ApiConstants.produtos}/$id');
     try {
-      final response = await http.delete(url, headers: _headers).timeout(const Duration(seconds: 60));
+      final response = await http.delete(url, headers: _headers);
       if (response.body.isNotEmpty) {
         return jsonDecode(response.body);
       }
