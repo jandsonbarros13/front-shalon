@@ -71,67 +71,29 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Future<void> _abrirSeletorDataPersonalizado(Color corTema) async {
-    final PickerDateRange? picked = await showDialog<PickerDateRange>(
+    final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      builder: (context) {
-        DateTime? inicio;
-        DateTime? fim;
-        return AlertDialog(
-          title: const Text('Selecionar Período', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: Colors.white),
-                onPressed: () async {
-                  final d = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (d != null) inicio = d;
-                },
-                icon: const Icon(Icons.date_range),
-                label: const Text('Data Inicial'),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: Colors.white),
-                onPressed: () async {
-                  final d = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (d != null) fim = d;
-                },
-                icon: const Icon(Icons.date_range),
-                label: const Text('Data Final'),
-              ),
-            ],
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: corTema,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            TextButton(
-              onPressed: () {
-                if (inicio != null && fim != null) {
-                  Navigator.pop(context, PickerDateRange(inicio!, fim!));
-                }
-              },
-              child: const Text('Filtrar', style: TextStyle(fontWeight: FontWeight.bold)),
-            )
-          ],
+          child: child!,
         );
-      }
+      },
     );
 
     if (picked != null) {
       setState(() {
         _filtroSelecionado = 'Personalizado';
-        _dataInicioQuery = _formatarData(picked.inicio);
-        _dataFimQuery = _formatarData(picked.fim);
+        _dataInicioQuery = _formatarData(picked.start);
+        _dataFimQuery = _formatarData(picked.end);
       });
       _carregarMetricas();
     }
@@ -141,7 +103,8 @@ class _DashboardTabState extends State<DashboardTab> {
     setState(() => _isLoading = true);
     
     try {
-      final resultado = await _pedidoService.listarPedidos(1, dataInicio: _dataInicioQuery, dataFim: _dataFimQuery, limit: 0);
+      final int limiteRegistros = _filtroSelecionado == 'Tudo' ? 500 : 100;
+      final resultado = await _pedidoService.listarPedidos(1, dataInicio: _dataInicioQuery, dataFim: _dataFimQuery, limit: limiteRegistros);
       final pedidos = resultado['pedidos'] as List? ?? [];
       
       double faturamentoCalc = 0.0;
@@ -154,36 +117,37 @@ class _DashboardTabState extends State<DashboardTab> {
       Map<String, Map<String, dynamic>> clientesMap = {};
 
       for (var p in pedidos) {
-        final status = (p['status'] ?? '').toString();
-        final double valor = double.tryParse(p['valor_total'].toString()) ?? 0.0;
-        final clienteNome = p['cliente_nome'] ?? 'Desconhecido';
-        final clienteTel = p['cliente_telefone'] ?? '';
+        final status = (p['status'] ?? p['Status'] ?? '').toString().toLowerCase();
+        final double valor = double.tryParse((p['valor_total'] ?? p['ValorTotal'] ?? 0).toString()) ?? 0.0;
+        final clienteNome = p['cliente_nome'] ?? p['ClienteNome'] ?? 'Desconhecido';
+        final clienteTel = p['cliente_telefone'] ?? p['ClienteTelefone'] ?? '';
         final chaveCliente = '$clienteNome-$clienteTel';
-        final formaPgto = (p['forma_pagamento'] ?? '').toString().toLowerCase();
-        final tipoEnvio = (p['tipo_entrega'] ?? '').toString().toLowerCase();
+        final formaPgto = (p['forma_pagamento'] ?? p['FormaPagamento'] ?? '').toString().toLowerCase();
+        final tipoEnvio = (p['tipo_entrega'] ?? p['TipoEntrega'] ?? '').toString().toLowerCase();
 
-        if (status != 'Cancelado') {
-          if (status == 'Concluído') {
-            faturamentoCalc += valor;
+        if (status != 'cancelado') {
+          faturamentoCalc += valor;
+
+          if (status == 'concluido' || status == 'concluído' || status == 'finalizado') {
             concluidosCalc++;
-
-            if (!clientesMap.containsKey(chaveCliente)) {
-              clientesMap[chaveCliente] = {
-                'nome': clienteNome,
-                'telefone': clienteTel,
-                'total_gasto': 0.0,
-                'qtd_pedidos': 0,
-              };
-            }
-            clientesMap[chaveCliente]!['total_gasto'] += valor;
-            clientesMap[chaveCliente]!['qtd_pedidos'] += 1;
           } else {
             pendentesCalc++;
           }
 
+          if (!clientesMap.containsKey(chaveCliente)) {
+            clientesMap[chaveCliente] = {
+              'nome': clienteNome,
+              'telefone': clienteTel,
+              'total_gasto': 0.0,
+              'qtd_pedidos': 0,
+            };
+          }
+          clientesMap[chaveCliente]!['total_gasto'] += valor;
+          clientesMap[chaveCliente]!['qtd_pedidos'] += 1;
+
           if (formaPgto.contains('pix')) {
             pix++;
-          } else if (formaPgto.contains('cart')) {
+          } else if (formaPgto.contains('cart') || formaPgto.contains('cred') || formaPgto.contains('deb')) {
             cartao++;
           } else {
             dinheiro++;
@@ -197,7 +161,8 @@ class _DashboardTabState extends State<DashboardTab> {
         }
       }
 
-      double ticketCalc = concluidosCalc > 0 ? (faturamentoCalc / concluidosCalc) : 0.0;
+      int totalVendasEfetivas = concluidosCalc + pendentesCalc;
+      double ticketCalc = totalVendasEfetivas > 0 ? (faturamentoCalc / totalVendasEfetivas) : 0.0;
 
       List<Map<String, dynamic>> listaClientes = clientesMap.values.toList();
       listaClientes.sort((a, b) => b['total_gasto'].compareTo(a['total_gasto']));
@@ -205,7 +170,7 @@ class _DashboardTabState extends State<DashboardTab> {
       setState(() {
         _faturamentoTotal = faturamentoCalc;
         _pedidosPendentes = pendentesCalc;
-        _totalPedidosValidos = concluidosCalc + pendentesCalc;
+        _totalPedidosValidos = totalVendasEfetivas;
         _ticketMedio = ticketCalc;
         _topClientes = listaClientes.take(5).toList();
         _qtdPix = pix;
@@ -304,7 +269,7 @@ class _DashboardTabState extends State<DashboardTab> {
               physics: const NeverScrollableScrollPhysics(),
               childAspectRatio: largura > 1200 ? 2.0 : 2.5,
               children: [
-                _buildCard('Faturamento (Concluídos)', 'R\$ ${_faturamentoTotal.toStringAsFixed(2).replaceAll('.', ',')}', Icons.monetization_on, Colors.green),
+                _buildCard('Faturamento Total Acumulado', 'R\$ ${_faturamentoTotal.toStringAsFixed(2).replaceAll('.', ',')}', Icons.monetization_on, Colors.green),
                 _buildCard('Fila de Preparo', '$_pedidosPendentes', Icons.hourglass_empty, Colors.amber[700]!),
                 _buildCard('Ticket Médio', 'R\$ ${_ticketMedio.toStringAsFixed(2).replaceAll('.', ',')}', Icons.receipt_long, Colors.purple),
                 _buildCard('Total de Pedidos', '$_totalPedidosValidos', Icons.shopping_bag, Colors.blue),
@@ -488,7 +453,7 @@ class _DashboardTabState extends State<DashboardTab> {
               children: [
                 Icon(Icons.emoji_events, color: Colors.amber[700], size: 28),
                 const SizedBox(width: 8),
-                Text('Top 5 Clientes VIP', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: corTema)),
+                Text('Top 5 Clientes VIP (Faturamento)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: corTema)),
               ],
             ),
             const SizedBox(height: 16),

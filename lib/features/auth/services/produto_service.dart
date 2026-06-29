@@ -9,11 +9,9 @@ class ProdutoService {
     'Accept': 'application/json',
   };
 
-  Future<Map<String, dynamic>> buscarProdutos(int pagina, {String nome = '', int limit = 8}) async {
-    final url = Uri.parse('${ApiConstants.produtos}?page=$pagina&limit=$limit&nome=$nome');
+  Future<Map<String, dynamic>> buscarProdutos(int pagina, {String nome = '', int limit = 8, bool semFoto = false}) async {
+    final url = Uri.parse('${ApiConstants.produtos}?page=$pagina&limit=$limit&nome=$nome&sem_foto=$semFoto');
     try {
-      // REMOVI O TIMEOUT! Imagens em Base64 pesam muito (seu print marcou 12.5MB). 
-      // Deixe o Flutter pensar o tempo que precisar.
       final response = await http.get(url, headers: _headers);
       
       if (response.statusCode == 200) {
@@ -34,7 +32,6 @@ class ProdutoService {
         print("Erro na resposta do Servidor Go: Status ${response.statusCode}");
       }
     } catch (e, stacktrace) {
-      // SE AINDA FICAR BRANCO, OLHE A ABA "CONSOLE" NO GOOGLE CHROME!
       print("🚨 ERRO CRÍTICO AO LER OS PRODUTOS: $e");
       print(stacktrace);
     }

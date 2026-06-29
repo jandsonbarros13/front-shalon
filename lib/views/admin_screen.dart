@@ -3,6 +3,8 @@ import 'dart:js' as js;
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'admin/dashboard_tab.dart';
+import 'admin/venda.dart';
+import 'admin/minhasVendas.dart';
 import 'admin/produtos_tab.dart';
 import 'admin/pedidos_tab.dart';
 import 'admin/catalogo_tab.dart';
@@ -27,6 +29,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   final List<String> _titulos = [
     'Dashboard Shalom',
+    'Ponto de Venda (PDV)',
+    'Histórico de Vendas',
     'Controle de Produtos',
     'Pedidos da Loja',
     'Catálogo Digital',
@@ -36,6 +40,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   final List<Widget> _abas = [
     const DashboardTab(),
+    const VendaPage(),
+    const MinhasVendas(),
     const ProdutosTab(),
     const PedidosTab(),
     const CatalogoTab(),
@@ -153,7 +159,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 2);
+                setState(() => _abaSelecionada = 4);
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -186,7 +192,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 2);
+                setState(() => _abaSelecionada = 4);
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -236,8 +242,8 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.icecream_outlined, color: corTema),
-              title: const Text('Produtos', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.point_of_sale, color: corTema),
+              title: const Text('Vendas (PDV)', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 1,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
@@ -246,8 +252,8 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.list_alt, color: corTema),
-              title: const Text('Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.history_toggle_off, color: corTema),
+              title: const Text('Minhas Vendas', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 2,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
@@ -256,8 +262,8 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.auto_stories, color: corTema),
-              title: const Text('Catálogo', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.icecream_outlined, color: corTema),
+              title: const Text('Produtos', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 3,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
@@ -266,8 +272,8 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.people, color: corTema),
-              title: const Text('Usuários', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.list_alt, color: corTema),
+              title: const Text('Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 4,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
@@ -276,12 +282,32 @@ class _AdminScreenState extends State<AdminScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.local_shipping, color: corTema),
-              title: const Text('Configurar Frete', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.auto_stories, color: corTema),
+              title: const Text('Catálogo', style: TextStyle(fontWeight: FontWeight.bold)),
               selected: _abaSelecionada == 5,
               selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
               onTap: () {
                 setState(() => _abaSelecionada = 5);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: corTema),
+              title: const Text('Usuários', style: TextStyle(fontWeight: FontWeight.bold)),
+              selected: _abaSelecionada == 6,
+              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
+              onTap: () {
+                setState(() => _abaSelecionada = 6);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.local_shipping, color: corTema),
+              title: const Text('Configurar Frete', style: TextStyle(fontWeight: FontWeight.bold)),
+              selected: _abaSelecionada == 7,
+              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
+              onTap: () {
+                setState(() => _abaSelecionada = 7);
                 Navigator.pop(context);
               },
             ),
