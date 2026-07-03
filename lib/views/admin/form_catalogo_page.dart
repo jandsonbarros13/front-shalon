@@ -67,9 +67,9 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     _tituloController.dispose();
     _descricaoController.dispose();
     _pesquisaController.dispose();
-    for (var c in _precoControllers.values) { c.dispose(); }
-    for (var c in _estoqueControllers.values) { c.dispose(); }
-    for (var c in _obsControllers.values) { c.dispose(); }
+    for (var p in _precoControllers.values) { p.dispose(); }
+    for (var e in _estoqueControllers.values) { e.dispose(); }
+    for (var o in _obsControllers.values) { o.dispose(); }
     super.dispose();
   }
 
@@ -147,7 +147,8 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        final List<dynamic> dados = jsonDecode(response.body);
+        final Map<String, dynamic> corpoJson = jsonDecode(response.body);
+        final List<dynamic> dados = corpoJson['produtos'] ?? corpoJson['Produtos'] ?? [];
         
         setState(() {
           _resultadosPesquisa = dados.where((p) {
