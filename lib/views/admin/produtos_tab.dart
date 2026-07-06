@@ -135,6 +135,7 @@ class _ProdutosTabState extends State<ProdutosTab> {
   Color _getBadgeColor(String categoria) {
     switch (categoria) {
       case 'Adicionais': return Colors.orange[800]!;
+      case 'Cremes': return Colors.purple[700]!;
       case 'Produtos': return Colors.teal[700]!;
       case 'Bebidas': return Colors.blue[700]!;
       case 'Combos': return Colors.red[700]!;
@@ -343,21 +344,7 @@ class _ProdutosTabState extends State<ProdutosTab> {
                                                   Container(
                                                     width: double.infinity,
                                                     color: const Color(0xFFF5F5F5),
-                                                    child: fotos.isEmpty
-                                                        ? Center(
-                                                            child: Container(
-                                                              width: 50,
-                                                              height: 50,
-                                                              decoration: const BoxDecoration(
-                                                                shape: BoxShape.circle,
-                                                                image: DecorationImage(
-                                                                  image: AssetImage('assets/images/logo.jpg'),
-                                                                  fit: BoxFit.cover,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          )
-                                                        : CarrosselFotosWidget(fotos: fotos),
+                                                    child: CarrosselFotosWidget(fotos: fotos),
                                                   ),
                                                   Positioned(
                                                     top: 8,
@@ -480,32 +467,40 @@ class _CarrosselFotosWidgetState extends State<CarrosselFotosWidget> {
   final PageController _pageController = PageController();
   Timer? _timer;
   int _currentPage = 0;
-  final List<Uint8List> _cachedBytes = [];
+  final List<dynamic> _processedImages = [];
 
   @override
   void initState() {
     super.initState();
-    _processarEPrevinirPisca();
+    _processarImagens();
   }
 
-  void _processarEPrevinirPisca() {
+  void _processarImagens() {
+    if (widget.fotos.isEmpty) return;
     for (var f in widget.fotos) {
-      String foto = f;
-      if (foto.contains(',')) foto = foto.split(',')[1];
-      foto = foto.replaceAll('\n', '').replaceAll('\r', '').trim();
-      try {
-        _cachedBytes.add(base64Decode(foto));
-      } catch (_) {}
+      String foto = f.trim();
+      if (foto.isEmpty || foto.contains('placeholder.com')) {
+        continue;
+      }
+      if (foto.startsWith('http://') || foto.startsWith('https://')) {
+        _processedImages.add(foto);
+      } else {
+        if (foto.contains(',')) foto = foto.split(',')[1];
+        foto = foto.replaceAll('\n', '').replaceAll('\r', '').trim();
+        try {
+          _processedImages.add(base64Decode(foto));
+        } catch (_) {}
+      }
     }
   }
 
   void _iniciarCarrossel() {
-    if (_cachedBytes.length <= 1) return;
+    if (_processedImages.length <= 1) return;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (mounted && _pageController.hasClients) {
         _currentPage++;
-        if (_currentPage >= _cachedBytes.length) {
+        if (_currentPage >= _processedImages.length) {
           _currentPage = 0;
         }
         _pageController.animateToPage(
@@ -535,12 +530,19 @@ class _CarrosselFotosWidgetState extends State<CarrosselFotosWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cachedBytes.isEmpty) {
-      return const Center(child: Icon(Icons.broken_image, color: Colors.grey));
+    if (_processedImages.isEmpty) {
+      return Image.asset(
+        'assets/images/logo.jpg',
+        fit: BoxFit.cover,
+      );
     }
 
-    if (_cachedBytes.length == 1) {
-      return Image.memory(_cachedBytes.first, fit: BoxFit.cover, gaplessPlayback: true);
+    if (_processedImages.length == 1) {
+      final img = _processedImages.first;
+      if (img is String) {
+        return Image.network(img, fit: BoxFit.cover, gaplessPlayback: true);
+      }
+      return Image.memory(img, fit: BoxFit.cover, gaplessPlayback: true);
     }
 
     return MouseRegion(
@@ -553,14 +555,14 @@ class _CarrosselFotosWidgetState extends State<CarrosselFotosWidget> {
         child: PageView.builder(
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _cachedBytes.length,
+          itemCount: _processedImages.length,
           onPageChanged: (index) => _currentPage = index,
           itemBuilder: (context, index) {
-            return Image.memory(
-              _cachedBytes[index], 
-              fit: BoxFit.cover, 
-              gaplessPlayback: true,
-            );
+            final img = _processedImages[index];
+            if (img is String) {
+              return Image.network(img, fit: BoxFit.cover, gaplessPlayback: true);
+            }
+            return Image.memory(img, fit: BoxFit.cover, gaplessPlayback: true);
           },
         ),
       ),
