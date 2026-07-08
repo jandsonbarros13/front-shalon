@@ -26,7 +26,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   final Map<int, List<int>> _adicionaisEscolhidosPorItem = {};
 
   String _categoriaSelecionada = 'Tudo';
-  final List<String> _abasFiltro = ['Tudo', 'Montados', 'Combos', 'Bebidas', 'Produtos'];
+  final List<String> _abasFiltro = ['Tudo', 'Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
 
   int _paginaAtual = 1;
   final int _itensPorPagina = 12;
@@ -228,7 +228,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     int id = p['id'] ?? p['ID'];
     String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
     bool isUnidadePeso = checkPeso(un);
-    final String categoria = p['category'] ?? 'Montados';
+    final String categoria = p['category'] ?? 'Açai';
     
     double quantidadeOuPeso = _carrinho[id] ?? (isUnidadePeso ? 0.0 : 1.0);
     final obsController = TextEditingController(text: _observacoes[id] ?? '');
@@ -363,7 +363,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
               children: [
                 Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
                 
-                if (categoria == 'Montados') ...[
+                if (categoria == 'Açai' || categoria == 'Cremes') ...[
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -935,10 +935,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: screenWidth > 1100 ? 4 : (screenWidth > 750 ? 3 : 2),
-                        crossAxisSpacing: isMobile ? 12 : 24, 
-                        mainAxisSpacing: isMobile ? 12 : 24, 
-                        childAspectRatio: isMobile ? 0.63 : 0.68,
+                        crossAxisCount: screenWidth > 1100 ? 4 : (screenWidth > 750 ? 3 : 2), crossAxisSpacing: isMobile ? 12 : 24, mainAxisSpacing: isMobile ? 12 : 24, childAspectRatio: isMobile ? 0.63 : 0.68,
                       ),
                       itemCount: produtosPaginados.length,
                       itemBuilder: (context, index) {

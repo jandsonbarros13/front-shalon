@@ -28,7 +28,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
 
   List<String> _fotos = [];
   String _unidadeMedida = 'Unidade';
-  String _categoria = 'Montados';
+  String _categoria = 'Açai';
   bool _isSaving = false;
   bool _loadingFotoEdicao = false;
 
@@ -40,7 +40,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   final List<int> _adicionaisSelecionadosIds = [];
   final List<int> _produtosComboSelecionadosIds = [];
 
-  final List<String> _categorias = ['Montados', 'Combos', 'Bebidas', 'Produtos', 'Adicionais'];
+  final List<String> _categorias = ['Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
   final List<String> _unidades = ['Unidade', 'Kg', 'Grama'];
 
   @override
@@ -69,7 +69,13 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
       _descricaoController.text = p['description'] ?? '';
       _precoController.text = (p['price'] ?? '').toString();
       _estoqueController.text = (p['estoque'] ?? '').toString();
-      _categoria = p['category'] ?? 'Montados';
+      
+      String catOriginal = p['category'] ?? 'Açai';
+      if (_categorias.contains(catOriginal)) {
+        _categoria = catOriginal;
+      } else {
+        _categoria = 'Açai';
+      }
 
       String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
       if (un == 'kg' || un == 'quilo') {
@@ -93,7 +99,6 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
 
       _mostrarSelecionadosPorPadrao();
 
-      // Carregamento instantâneo da foto a partir da memória
       String imgUrl = p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '';
       if (imgUrl.isNotEmpty) {
         _fotos = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
@@ -122,7 +127,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   void _mostrarSelecionadosPorPadrao() {
     setState(() {
       _buscaRealizada = true;
-      if (_categoria == 'Montados') {
+      if (_categoria == 'Açai' || _categoria == 'Cremes') {
         _resultadosBusca = _todosAdicionaisCache.where((ad) => _adicionaisSelecionadosIds.contains(ad['id'] ?? ad['ID'])).toList();
       } else if (_categoria == 'Combos') {
         _resultadosBusca = _todosProdutosComboCache.where((prod) => _produtosComboSelecionadosIds.contains(prod['id'] ?? prod['ID'])).toList();
@@ -140,7 +145,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
 
     setState(() {
       _buscaRealizada = true;
-      if (_categoria == 'Montados') {
+      if (_categoria == 'Açai' || _categoria == 'Cremes') {
         _resultadosBusca = _todosAdicionaisCache.where((ad) {
           final nome = (ad['name'] ?? ad['Name'] ?? '').toString().toLowerCase();
           return nome.contains(termo) || _adicionaisSelecionadosIds.contains(ad['id'] ?? ad['ID']);
@@ -193,7 +198,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
       'image_url': _fotos.join('|||'),
       'size': '',
       'is_destaque': false,
-      'adicionais_ids': _categoria == 'Montados' ? _adicionaisSelecionadosIds : [],
+      'adicionais_ids': (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds : [],
       'combo_itens_ids': _categoria == 'Combos' ? _produtosComboSelecionadosIds : [],
     };
 
@@ -336,11 +341,11 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                         ),
                       ],
                     ),
-                    if (_categoria == 'Montados' || _categoria == 'Combos') ...[
+                    if (_categoria == 'Açai' || _categoria == 'Combos' || _categoria == 'Cremes') ...[
                       const SizedBox(height: 16),
                       const Divider(),
                       const SizedBox(height: 8),
-                      Text(_categoria == 'Montados' ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: const TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
+                      Text((_categoria == 'Açai' || _categoria == 'Cremes') ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: const TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -377,14 +382,14 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                   scrollDirection: Axis.horizontal,
                                   children: _resultadosBusca.map((item) {
                                     final int id = item['id'] ?? item['ID'];
-                                    final bool sel = _categoria == 'Montados' ? _adicionaisSelecionadosIds.contains(id) : _produtosComboSelecionadosIds.contains(id);
-                                    final String labelExtra = _categoria == 'Montados' ? '+R\$ ${item['price']}' : (item['category'] ?? item['Category'] ?? '');
+                                    final bool sel = (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds.contains(id) : _produtosComboSelecionadosIds.contains(id);
+                                    final String labelExtra = (_categoria == 'Açai' || _categoria == 'Cremes') ? '+R\$ ${item['price']}' : (item['category'] ?? item['Category'] ?? '');
                                     
                                     return Padding(
                                       padding: const EdgeInsets.only(right: 8.0),
                                       child: _buildCardSelecao(id, item['name'] ?? item['Name'] ?? '', labelExtra, item['image_url'] ?? '', sel, () {
                                         setState(() { 
-                                          if (_categoria == 'Montados') {
+                                          if (_categoria == 'Açai' || _categoria == 'Cremes') {
                                             sel ? _adicionaisSelecionadosIds.remove(id) : _adicionaisSelecionadosIds.add(id); 
                                           } else {
                                             sel ? _produtosComboSelecionadosIds.remove(id) : _produtosComboSelecionadosIds.add(id); 
