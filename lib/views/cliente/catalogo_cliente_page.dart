@@ -35,6 +35,8 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   String _termoBusca = '';
   final TextEditingController _searchController = TextEditingController();
 
+  final double _pedidoMinimo = 10.0;
+
   @override
   void initState() {
     super.initState();
@@ -88,7 +90,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
         _observacoes.remove(id);
         _adicionaisEscolhidosPorItem.remove(id);
       } else {
-        _carrinho[id] = quantidade;
+        _carrinho[id] = quantityCalculated(quantidade);
         if (obs.isNotEmpty) {
           _observacoes[id] = obs;
         } else {
@@ -101,6 +103,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
         }
       }
     });
+  }
+
+  double quantityCalculated(double qty) {
+    return qty <= 0 ? 1.0 : qty;
   }
 
   Future<void> _abrirCarrinho() async {
@@ -161,7 +167,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
           if (un == 'kg' || un == 'grama' || un == 'g') {
             total += (precoProduto / 1000.0) * quantidadeOuPeso;
           } else {
-            total += precoProduto * KitchenQtd(quantidadeOuPeso);
+            total += precoProduto * quantityCalculated(quantidadeOuPeso);
           }
 
           if (_adicionaisEscolhidosPorItem.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
@@ -171,7 +177,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
             for (var ad in ads) {
               if (escolhas.contains(ad['id'] ?? ad['ID'])) {
                 double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-                total += precoAd * (checkPeso(un) ? 1 : KitchenQtd(quantidadeOuPeso));
+                total += precoAd * (checkPeso(un) ? 1 : quantityCalculated(quantidadeOuPeso));
               }
             }
           }
@@ -179,10 +185,6 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
       }
     }
     return total;
-  }
-
-  double KitchenQtd(double val) {
-    return val <= 0 ? 1.0 : val;
   }
 
   bool checkPeso(String un) {
@@ -212,7 +214,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   List<dynamic> _filtrarProdutos() {
     if (_catalogo == null || _catalogo!['produtos'] == null) return [];
     final List<dynamic> todos = _catalogo!['produtos'];
-    List<dynamic> filtrados = todos.where((p) => _normalizarTexto(p['category'].toString()) != 'adicionais').toList();
+    List<dynamic> filtrados = List.from(todos);
 
     if (_categoriaSelecionada != 'Tudo') {
       filtrados = filtrados.where((p) => _normalizarTexto(p['category'].toString()) == _normalizarTexto(_categoriaSelecionada)).toList();
@@ -229,7 +231,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     if (_catalogo == null || _catalogo!['produtos'] == null) return null;
     final List<dynamic> todos = _catalogo!['produtos'];
     try {
-      final itens = todos.where((p) => _normalizarTexto(p['category'].toString()) != 'adicionais' && (categoria == 'Tudo' || _normalizarTexto(p['category'].toString()) == _normalizarTexto(categoria))).toList();
+      final itens = todos.where((p) => categoria == 'Tudo' || _normalizarTexto(p['category'].toString()) == _normalizarTexto(categoria)).toList();
       if (itens.isNotEmpty) {
         String urlCompleta = (itens.first['image_url'] ?? '').toString();
         if (urlCompleta.isNotEmpty && urlCompleta != 'null') {
@@ -293,7 +295,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
               children: [
                 p['image_url'] == null || p['image_url'].isEmpty
                     ? Icon(Icons.fastfood, size: 100, color: corTema.withOpacity(0.3))
-                    : CarrosselFotosPublicoWidget(fotos: p['image_url'].toString().split('|||').where((s) => s.isNotEmpty).toList()),
+                    : CarrosselFotosPublicoWidget(
+                        key: ValueKey('modal_${id}_${adicionaisSelecionadosLocais.length}'),
+                        fotos: p['image_url'].toString().split('|||').where((s) => s.isNotEmpty).toList(),
+                      ),
                 Positioned(
                   top: isMobile ? 32 : 16,
                   left: 16,
@@ -917,10 +922,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                 child: Container(
                   color: Colors.white,
                   child: imgUrl == null
-                      ? Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)
+                      ? Image.asset('assets/images/logo.jpg', fit: BoxFit.cover, key: ValueKey('asset_$aba'))
                       : imgUrl.startsWith('data:image')
-                          ? Image.memory(base64Decode(imgUrl.split(',')[1]), fit: BoxFit.cover)
-                          : Image.network(imgUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)),
+                          ? Image.memory(base64Decode(imgUrl.split(',')[1]), fit: BoxFit.cover, key: ValueKey('mem_circle_$aba'))
+                          : Image.network(imgUrl, fit: BoxFit.cover, key: ValueKey('net_circle_$aba'), errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)),
                 ),
               ),
             ),
@@ -992,6 +997,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     if (fimIdx > todosFiltrados.length) fimIdx = todosFiltrados.length;
     
     final produtosPaginados = todosFiltrados.isEmpty ? [] : todosFiltrados.sublist(inicioIdx, fimIdx);
+    final bool atingeMinimo = _valorTotalCarrinho >= _pedidoMinimo;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -1034,7 +1040,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                 width: isMobile ? 24 : 28, 
                 height: isMobile ? 24 : 28, 
                 fit: BoxFit.cover, 
-                errorBuilder: (c,e,s) => Icon(Icons.camera_alt_outlined, color: corLetras)
+                errorBuilder: (c, e, s) => Icon(Icons.camera_alt_outlined, color: corLetras)
               ),
             ), 
             onPressed: _abrirInstagram
@@ -1209,6 +1215,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                         final String nome = p['name'] ?? '';
                         final String desc = p['description'] ?? '';
                         final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
+                        final int pId = p['id'] ?? p['ID'] ?? index;
                         final String urlCompleta = (p['image_url'] ?? '').toString();
                         final List<String> fotos = urlCompleta == 'null' ? [] : urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
 
@@ -1228,7 +1235,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                     width: double.infinity,
                                     child: fotos.isEmpty
                                         ? Icon(Icons.fastfood, size: 40, color: corTema.withOpacity(0.2))
-                                        : CarrosselFotosPublicoWidget(fotos: fotos),
+                                        : CarrosselFotosPublicoWidget(
+                                            key: ValueKey('grid_${pId}_$_categoriaSelecionada'),
+                                            fotos: fotos,
+                                          ),
                                   ),
                                 ),
                               ),
@@ -1350,7 +1360,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
               height: 60,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: corTema, 
+                  backgroundColor: atingeMinimo ? corTema : Colors.grey[700], 
                   foregroundColor: corLetras,
                   elevation: 8,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -1367,7 +1377,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                         decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(24)),
                         child: Text('$_quantidadeTotalItens itens', style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 13)),
                       ),
-                      Text('VER MEU CARRINHO', style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5)),
+                      Text(
+                        atingeMinimo ? 'VER MEU CARRINHO' : 'FALTA R\$ ${(_pedidoMinimo - _valorTotalCarrinho).toStringAsFixed(2).replaceAll('.', ',')} P/ MINIMO',
+                        style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                      ),
                       Text('R\$ ${_valorTotalCarrinho.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 15)),
                     ],
                   ),
@@ -1400,6 +1413,7 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
   }
 
   void _processarEPrevinirPisca() {
+    _cachedBytes.clear();
     for (var f in widget.fotos) {
       if (f.startsWith('data:image') && f.contains(',')) {
         try {
@@ -1443,7 +1457,7 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
       onEnter: (_) => _iniciarCarrossel(),
       onExit: (_) => _pararCarrossel(),
       child: GestureDetector(
-        onTapDown: (_) => _iniciarCarrossel(),
+        onTapDown: (_) => _iniciarChaveOuCarrossel(),
         onTapUp: (_) => _pararCarrossel(),
         onTapCancel: () => _pararCarrossel(),
         child: PageView.builder(
@@ -1456,10 +1470,10 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
             
             if (foto.startsWith('data:image')) {
               if (_cachedBytes.length > index) {
-                return Image.memory(_cachedBytes[index], fit: BoxFit.cover);
+                return Image.memory(_cachedBytes[index], fit: BoxFit.cover, key: ValueKey('memory_${index}_${widget.fotos.length}'));
               }
               try {
-                return Image.memory(base64Decode(foto.split(',')[1]), fit: BoxFit.cover);
+                return Image.memory(base64Decode(foto.split(',')[1]), fit: BoxFit.cover, key: ValueKey('memory_fallback_${index}'));
               } catch (_) {
                 return Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey));
               }
@@ -1468,11 +1482,16 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
             return Image.network(
               foto, 
               fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover),
+              key: ValueKey('network_${foto.hashCode}_${index}'),
+              errorBuilder: (c, e, s) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover, key: ValueKey('asset_err_$index')),
             );
           },
         ),
       ),
     );
+  }
+
+  void _iniciarChaveOuCarrossel() {
+    _iniciarCarrossel();
   }
 }

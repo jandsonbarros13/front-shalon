@@ -21,6 +21,8 @@ class CarrinhoPage extends StatefulWidget {
 }
 
 class _CarrinhoPageState extends State<CarrinhoPage> {
+  final double _pedidoMinimo = 10.0;
+
   Color _hexToColor(String hex) {
     try {
       return Color(int.parse(hex.replaceFirst('#', '0xFF')));
@@ -72,6 +74,19 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
   }
 
   void _irParaCheckout() async {
+    if (_valorTotal < _pedidoMinimo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'O pedido mínimo para entrega é de R\$ ${_pedidoMinimo.toStringAsFixed(2).replaceAll('.', ',')}!',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -99,6 +114,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
     final produtos = widget.catalogo['produtos'] as List;
 
     final itensNoCarrinho = produtos.where((p) => widget.carrinho.containsKey(p['id'] ?? p['ID'])).toList();
+    final bool atingeMinimo = _valorTotal >= _pedidoMinimo;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -336,7 +352,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                             height: isMobile ? 50 : 60,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
+                                backgroundColor: atingeMinimo ? const Color(0xFF25D366) : Colors.grey,
                                 foregroundColor: Colors.white,
                                 elevation: 4,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -345,9 +361,14 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('CONTINUAR PARA PAGAMENTO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 13 : 16, letterSpacing: isMobile ? 0 : 1)),
+                                  Text(
+                                    atingeMinimo 
+                                        ? 'CONTINUAR PARA PAGAMENTO' 
+                                        : 'FALTA R\$ ${(_pedidoMinimo - _valorTotal).toStringAsFixed(2).replaceAll('.', ',')} P/ PEDIDO MÍNIMO', 
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 12 : 16, letterSpacing: isMobile ? 0 : 1),
+                                  ),
                                   const SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward_ios, size: isMobile ? 16 : 20),
+                                  if (atingeMinimo) Icon(Icons.arrow_forward_ios, size: isMobile ? 16 : 20),
                                 ],
                               ),
                             ),
