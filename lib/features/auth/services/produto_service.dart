@@ -9,8 +9,9 @@ class ProdutoService {
     'Accept': 'application/json',
   };
 
-  Future<Map<String, dynamic>> buscarProdutos(int pagina, {String nome = '', int limit = 8, bool semFoto = false}) async {
-    final url = Uri.parse('${ApiConstants.produtos}?page=$pagina&limit=$limit&nome=$nome&sem_foto=$semFoto');
+  // Busca lista com filtros
+  Future<Map<String, dynamic>> buscarProdutos(int pagina, {String nome = '', String categoria = '', int limit = 8, bool semFoto = false}) async {
+    final url = Uri.parse('${ApiConstants.produtos}?page=$pagina&limit=$limit&nome=$nome&categoria=$categoria&sem_foto=$semFoto');
     try {
       final response = await http.get(url, headers: _headers);
       
@@ -28,15 +29,26 @@ class ProdutoService {
             'total': decoded.length,
           };
         }
-      } else {
-        print("Erro na resposta do Servidor Go: Status ${response.statusCode}");
       }
-    } catch (e, stacktrace) {
-      print("🚨 ERRO CRÍTICO AO LER OS PRODUTOS: $e");
-      print(stacktrace);
+    } catch (e) {
+      print("🚨 ERRO LER PRODUTOS: $e");
     }
     
     return {'produtos': [], 'total': 0};
+  }
+
+  // BUSCA PRODUTO ÚNICO DIRETO NO GO
+  Future<Map<String, dynamic>?> buscarProdutoPorId(int id) async {
+    final url = Uri.parse('${ApiConstants.produtos}/$id');
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body); 
+      }
+    } catch (e) {
+      print("Erro ao buscar produto por ID: $e");
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> cadastrarProduto(Map<String, dynamic> dados) async {
@@ -49,7 +61,7 @@ class ProdutoService {
       );
       return jsonDecode(response.body);
     } catch (e) {
-      return {'success': false, 'message': 'Erro ao conectar ao servidor Go.'};
+      return {'success': false, 'message': 'Erro ao conectar ao servidor.'};
     }
   }
 

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:acaiteria_front/core/constants/api_constants.dart';
 import 'package:acaiteria_front/features/auth/services/catalogo_service.dart';
+import 'package:acaiteria_front/features/auth/services/produto_service.dart';
+import 'package:acaiteria_front/features/auth/services/imgbb_service.dart';
 
 class FormCatalogoPage extends StatefulWidget {
   final Map<String, dynamic>? catalogoParaEditar;
@@ -17,6 +19,8 @@ class FormCatalogoPage extends StatefulWidget {
 
 class _FormCatalogoPageState extends State<FormCatalogoPage> {
   final _catalogoService = CatalogoService();
+  final _produtoService = ProdutoService(); 
+  
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _descricaoController = TextEditingController();
@@ -26,12 +30,13 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
   String _corLetras = '#FFFFFF';
   String _fotoCapa = '';
   bool _isSaving = false;
+  bool _isUploadingCapa = false; 
   
   bool _isLoadingEdit = true;
   bool _isSearching = false;
   
   List<dynamic> _resultadosPesquisa = [];
-  dynamic _produtoSelecionadoDaBusca;
+  int? _produtoSelecionadoId; 
   List<dynamic> _produtosSelecionados = []; 
   
   final Map<int, TextEditingController> _precoControllers = {};
@@ -130,49 +135,42 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     
     setState(() {
       _isSearching = true;
-      _produtoSelecionadoDaBusca = null;
+      _produtoSelecionadoId = null; 
       _resultadosPesquisa = [];
     });
 
     try {
-      String urlBaseLimpa = ApiConstants.baseUrl.trim();
-      if (urlBaseLimpa.endsWith('/')) {
-        urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 1);
-      }
-      if (urlBaseLimpa.endsWith('/api')) {
-        urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 4);
-      }
+      final resultado = await _produtoService.buscarProdutos(1, nome: termo, limit: 50);
+      final List<dynamic> dados = resultado['produtos'] ?? [];
 
-      final url = Uri.parse('$urlBaseLimpa/api/produtos?nome=$termo');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> corpoJson = jsonDecode(response.body);
-        final List<dynamic> dados = corpoJson['produtos'] ?? corpoJson['Produtos'] ?? [];
+      setState(() {
+        _resultadosPesquisa = dados.where((p) {
+          final int pId = int.tryParse((p['id'] ?? p['ID'] ?? 0).toString()) ?? 0;
+          return !_produtosSelecionados.any((sel) => sel['id'] == pId);
+        }).toList();
         
-        setState(() {
-          _resultadosPesquisa = dados.where((p) {
-            return !_produtosSelecionados.any((sel) => sel['id'] == p['id']);
-          }).toList();
-          _isSearching = false;
-        });
-      } else {
-        setState(() => _isSearching = false);
-      }
+        _isSearching = false;
+      });
     } catch (_) {
       setState(() => _isSearching = false);
     }
   }
 
   void _adicionarProdutoAoCatalogo(Map<String, dynamic> produto) {
-    final int id = produto['id'];
+    final int id = int.tryParse((produto['id'] ?? produto['ID'] ?? 0).toString()) ?? 0;
     setState(() {
-      _produtosSelecionados.insert(0, produto); 
-      _precoControllers[id] = TextEditingController(text: (produto['price'] ?? '').toString());
-      _estoqueControllers[id] = TextEditingController(text: (produto['estoque'] ?? '').toString());
+      _produtosSelecionados.insert(0, {
+        'id': id,
+        'name': produto['name'] ?? produto['Name'] ?? 'Sem Nome',
+        'price': produto['price'] ?? produto['Price'] ?? 0,
+        'estoque': produto['estoque'] ?? produto['Estoque'] ?? 0,
+        'image_url': produto['image_url'] ?? produto['ImageURL'] ?? '',
+      }); 
+      _precoControllers[id] = TextEditingController(text: (produto['price'] ?? produto['Price'] ?? '').toString());
+      _estoqueControllers[id] = TextEditingController(text: (produto['estoque'] ?? produto['Estoque'] ?? '').toString());
       _obsControllers[id] = TextEditingController(text: '');
       
-      _produtoSelecionadoDaBusca = null;
+      _produtoSelecionadoId = null;
       _resultadosPesquisa = [];
       _pesquisaController.clear();
     });
@@ -193,13 +191,33 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
 
   Future<void> _escolherFotoCapa() async {
     final picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    
     if (pickedFile != null) {
-      final bytes = await pickedFile.readAsBytes();
-      final base64Image = 'data:${pickedFile.mimeType ?? "image/jpeg"};base64,${base64Encode(bytes)}';
-      setState(() {
-        _fotoCapa = base64Image;
-      });
+      setState(() => _isUploadingCapa = true); 
+      
+      try {
+        final bytes = await pickedFile.readAsBytes();
+        final rawBase64 = base64Encode(bytes); 
+        
+        final urlHospedada = await ImgbbService.uploadImage(rawBase64);
+
+        if (urlHospedada != null) {
+          setState(() {
+            _fotoCapa = urlHospedada; 
+          });
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Falha ao subir capa pro servidor.'), backgroundColor: Colors.red)
+            );
+          }
+        }
+      } catch (e) {
+        print("Erro ao processar a capa: $e");
+      } finally {
+        setState(() => _isUploadingCapa = false); 
+      }
     }
   }
 
@@ -379,14 +397,16 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: Colors.grey[300]!),
                             ),
-                            child: _fotoCapa.isEmpty
-                                ? const Center(child: Icon(Icons.wallpaper, color: Colors.grey, size: 40))
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: _fotoCapa.startsWith('data:image')
-                                        ? Image.memory(base64Decode(_fotoCapa.split(',')[1]), fit: BoxFit.cover)
-                                        : Image.network(_fotoCapa, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image)),
-                                  ),
+                            child: _isUploadingCapa 
+                                ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
+                                : _fotoCapa.isEmpty
+                                    ? const Center(child: Icon(Icons.wallpaper, color: Colors.grey, size: 40))
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: _fotoCapa.startsWith('data:image')
+                                            ? Image.memory(base64Decode(_fotoCapa.split(',')[1]), fit: BoxFit.cover)
+                                            : Image.network(_fotoCapa, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image)),
+                                      ),
                           ),
                         ),
                         Row(
@@ -403,11 +423,16 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                   side: BorderSide(color: corTemaDinamica.withOpacity(0.3)),
                                 ),
                               ),
-                              onPressed: _escolherFotoCapa,
-                              icon: const Icon(Icons.add_a_photo, size: 18),
-                              label: Text(_fotoCapa.isEmpty ? 'Escolher Capa' : 'Alterar Capa', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              onPressed: _isUploadingCapa ? null : _escolherFotoCapa, 
+                              icon: _isUploadingCapa 
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.add_a_photo, size: 18),
+                              label: Text(
+                                _isUploadingCapa ? 'Enviando...' : (_fotoCapa.isEmpty ? 'Escolher Capa' : 'Alterar Capa'), 
+                                style: const TextStyle(fontWeight: FontWeight.bold)
+                              ),
                             ),
-                            if (_fotoCapa.isNotEmpty) ...[
+                            if (_fotoCapa.isNotEmpty && !_isUploadingCapa) ...[
                               const SizedBox(width: 8),
                               IconButton(
                                 icon: const Icon(Icons.delete, color: Colors.red),
@@ -460,7 +485,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                           
                           SizedBox(
                             width: 320,
-                            child: DropdownButtonFormField<dynamic>(
+                            child: DropdownButtonFormField<int>(
                               isExpanded: true,
                               decoration: InputDecoration(
                                 labelText: 'Produto',
@@ -470,15 +495,17 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
                               ),
                               hint: const Text('Selecione...'),
-                              value: _produtoSelecionadoDaBusca,
+                              value: _produtoSelecionadoId,
                               items: _resultadosPesquisa.map((p) {
-                                return DropdownMenuItem<dynamic>(
-                                  value: p,
-                                  child: Text(p['name'], overflow: TextOverflow.ellipsis),
+                                final int id = int.tryParse((p['id'] ?? p['ID'] ?? 0).toString()) ?? 0;
+                                final String nome = p['name'] ?? p['Name'] ?? 'Sem Nome';
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text(nome, overflow: TextOverflow.ellipsis),
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                setState(() => _produtoSelecionadoDaBusca = val);
+                                setState(() => _produtoSelecionadoId = val);
                               },
                             ),
                           ),
@@ -494,8 +521,11 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                               ),
                               icon: const Icon(Icons.add_circle_outline),
                               label: const Text('Adicionar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              onPressed: _produtoSelecionadoDaBusca == null ? null : () {
-                                _adicionarProdutoAoCatalogo(_produtoSelecionadoDaBusca!);
+                              onPressed: _produtoSelecionadoId == null ? null : () {
+                                final produto = _resultadosPesquisa.firstWhere(
+                                  (p) => int.tryParse((p['id'] ?? p['ID']).toString()) == _produtoSelecionadoId
+                                );
+                                _adicionarProdutoAoCatalogo(produto);
                               },
                             ),
                           ),
@@ -539,7 +569,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                         decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(8),
-                                          child: fotos.isEmpty
+                                          child: fotos.isEmpty || fotos.first == 'null'
                                               ? const Icon(Icons.fastfood, color: Colors.grey)
                                               : fotos.first.startsWith('data:image')
                                                   ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)

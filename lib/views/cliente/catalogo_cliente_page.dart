@@ -19,6 +19,7 @@ class CatalogoClientePage extends StatefulWidget {
 class _CatalogoClientePageState extends State<CatalogoClientePage> {
   bool _isLoading = true;
   Map<String, dynamic>? _catalogo;
+  Map<String, dynamic>? _empresa; 
   int? _hoveredIndex;
   
   final Map<int, double> _carrinho = {};
@@ -26,7 +27,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   final Map<int, List<int>> _adicionaisEscolhidosPorItem = {};
 
   String _categoriaSelecionada = 'Tudo';
-  final List<String> _abasFiltro = ['Tudo', 'Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
+  List<String> _abasFiltro = ['Tudo'];
 
   int _paginaAtual = 1;
   final int _itensPorPagina = 12;
@@ -35,7 +36,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   String _termoBusca = '';
   final TextEditingController _searchController = TextEditingController();
 
-  final double _pedidoMinimo = 10.0;
+  double _pedidoMinimo = 10.0;
 
   @override
   void initState() {
@@ -71,8 +72,39 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
+        _catalogo = jsonDecode(response.body);
+          
+        Set<String> categoriasEncontradas = {};
+        if (_catalogo!['produtos'] != null) {
+          for (var p in _catalogo!['produtos']) {
+            String cat = (p['category'] ?? p['Category'] ?? '').toString().trim();
+            if (cat.isNotEmpty) {
+              cat = cat[0].toUpperCase() + cat.substring(1);
+              categoriasEncontradas.add(cat);
+            }
+          }
+        }
+          
+        List<String> listaOrdenada = categoriasEncontradas.toList()..sort();
+        _abasFiltro = ['Tudo', ...listaOrdenada];
+
+        try {
+          final urlEmp = Uri.parse('$urlBaseLimpa/api/empresa');
+          final resEmp = await http.get(urlEmp);
+          if (resEmp.statusCode == 200) {
+            var dados = jsonDecode(resEmp.body);
+            if (dados is List && dados.isNotEmpty) {
+              _empresa = dados[0];
+            } else if (dados is Map<String, dynamic>) {
+              _empresa = dados;
+            }
+            if (_empresa != null && _empresa!['pedido_minimo'] != null) {
+              _pedidoMinimo = double.tryParse(_empresa!['pedido_minimo'].toString().replaceAll(',', '.')) ?? 10.0;
+            }
+          }
+        } catch (_) {}
+
         setState(() {
-          _catalogo = jsonDecode(response.body);
           _isLoading = false;
         });
       } else {
@@ -173,10 +205,24 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
           if (_adicionaisEscolhidosPorItem.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
             final escolhas = _adicionaisEscolhidosPorItem[id]!;
             final List<dynamic> ads = p['adicionais'];
+            final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
             
+            List<dynamic> selAds = [];
             for (var ad in ads) {
               if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-                double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+                selAds.add(ad);
+              }
+            }
+            
+            selAds.sort((a, b) {
+              double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+              double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+              return pa.compareTo(pb);
+            });
+            
+            for (int i = 0; i < selAds.length; i++) {
+              if (i >= maxGratuitos) {
+                double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
                 total += precoAd * (checkPeso(un) ? 1 : quantityCalculated(quantidadeOuPeso));
               }
             }
@@ -193,9 +239,38 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   }
 
   void _abrirInstagram() async {
-    final Uri url = Uri.parse('https://instagram.com/acaiteriashalom2026');
+    String instaRaw = _empresa?['instagram']?.toString() ?? _catalogo?['instagram']?.toString() ?? '';
+    if (instaRaw.contains('instagram.com/')) {
+      instaRaw = instaRaw.split('instagram.com/').last;
+    }
+    final String userLimpo = instaRaw.replaceAll('/', '').replaceAll('@', '').trim();
+    
+    if (userLimpo.isEmpty) return;
+
+    final Uri url = Uri.parse('https://instagram.com/$userLimpo');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _abrirWhatsApp() async {
+    final String numeroRaw = _empresa?['whatsapp']?.toString() ?? _catalogo?['whatsapp']?.toString() ?? '';
+    final String numero = numeroRaw.replaceAll(RegExp(r'[^0-9]'), '');
+    
+    if (numero.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('WhatsApp não configurado pela empresa.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final Uri url = Uri.parse('https://wa.me/55$numero');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível abrir o WhatsApp.')),
+      );
     }
   }
 
@@ -203,10 +278,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     return texto
         .toLowerCase()
         .replaceAll('ç', 'c')
-        .replaceAll('á', 'a')
-        .replaceAll('é', 'e')
+        .replaceAll(RegExp(r'[áàãâ]'), 'a')
+        .replaceAll(RegExp(r'[éê]'), 'e')
         .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
+        .replaceAll(RegExp(r'[óõô]'), 'o')
         .replaceAll('ú', 'u')
         .trim();
   }
@@ -217,7 +292,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     List<dynamic> filtrados = List.from(todos);
 
     if (_categoriaSelecionada != 'Tudo') {
-      filtrados = filtrados.where((p) => _normalizarTexto(p['category'].toString()) == _normalizarTexto(_categoriaSelecionada)).toList();
+      String catNormalizada = _normalizarTexto(_categoriaSelecionada);
+      filtrados = filtrados.where((p) {
+        String prodCat = _normalizarTexto(p['category'].toString());
+        return prodCat == catNormalizada || prodCat.startsWith(catNormalizada) || catNormalizada.startsWith(prodCat);
+      }).toList();
     }
 
     if (_termoBusca.isNotEmpty) {
@@ -231,7 +310,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     if (_catalogo == null || _catalogo!['produtos'] == null) return null;
     final List<dynamic> todos = _catalogo!['produtos'];
     try {
-      final itens = todos.where((p) => categoria == 'Tudo' || _normalizarTexto(p['category'].toString()) == _normalizarTexto(categoria)).toList();
+      final itens = todos.where((p) => categoria == 'Tudo' || _normalizarTexto(p['category'].toString()).startsWith(_normalizarTexto(categoria))).toList();
       if (itens.isNotEmpty) {
         String urlCompleta = (itens.first['image_url'] ?? '').toString();
         if (urlCompleta.isNotEmpty && urlCompleta != 'null') {
@@ -273,6 +352,25 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
         child: StatefulBuilder(
           builder: (context, setModalState) {
             
+            int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+            
+            Set<int> idsGratuitos = {};
+            if (maxGratuitos > 0) {
+              List<dynamic> selAds = [];
+              for (var adId in adicionaisSelecionadosLocais) {
+                var ad = adicionaisDoProduto.firstWhere((a) => (a['id'] ?? a['ID']) == adId, orElse: () => null);
+                if (ad != null) selAds.add(ad);
+              }
+              selAds.sort((a, b) {
+                double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+                double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+                return pa.compareTo(pb);
+              });
+              for (int i = 0; i < selAds.length && i < maxGratuitos; i++) {
+                idsGratuitos.add(selAds[i]['id'] ?? selAds[i]['ID']);
+              }
+            }
+
             double qtdAtual = isUnidadePeso ? (double.tryParse(pesoController.text) ?? 0.0) : quantidadeDesejada;
             double precoProduto = double.tryParse(p['price'].toString()) ?? 0.0;
             
@@ -282,23 +380,31 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
 
             double custoAdicionais = 0.0;
             for (var adId in adicionaisSelecionadosLocais) {
-              var ad = adicionaisDoProduto.firstWhere((a) => (a['id'] ?? a['ID']) == adId, orElse: () => null);
-              if (ad != null) {
-                double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-                custoAdicionais += precoAd * (isUnidadePeso ? 1 : qtdAtual);
+              if (!idsGratuitos.contains(adId)) {
+                var ad = adicionaisDoProduto.firstWhere((a) => (a['id'] ?? a['ID']) == adId, orElse: () => null);
+                if (ad != null) {
+                  double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+                  custoAdicionais += precoAd * (isUnidadePeso ? 1 : qtdAtual);
+                }
               }
             }
             double totalFinalExibido = valorBaseCalculado + custoAdicionais;
 
+            final String imgModal = (p['image_url'] ?? '').toString();
+
             final Widget imagemDestaque = Stack(
               fit: StackFit.expand,
               children: [
-                p['image_url'] == null || p['image_url'].isEmpty
-                    ? Icon(Icons.fastfood, size: 100, color: corTema.withOpacity(0.3))
-                    : CarrosselFotosPublicoWidget(
-                        key: ValueKey('modal_${id}_${adicionaisSelecionadosLocais.length}'),
-                        fotos: p['image_url'].toString().split('|||').where((s) => s.isNotEmpty).toList(),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: imgModal.isEmpty || imgModal == 'null'
+                      ? Icon(Icons.fastfood, size: 100, color: corTema.withOpacity(0.3))
+                      : CarrosselFotosPublicoWidget(
+                          key: ValueKey('modal_$id'),
+                          fotos: imgModal.split('|||').where((s) => s.isNotEmpty).toList(),
+                        ),
+                ),
                 Positioned(
                   top: isMobile ? 32 : 16,
                   left: 16,
@@ -358,28 +464,45 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                   shrinkWrap: true,
                                   children: [
                                     Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
-                                    if (categoria == 'Açai' || categoria == 'Cremes') ...[
+                                    
+                                    if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
                                       const SizedBox(height: 24),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                                         decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-                                        child: Row(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Icon(Icons.add_circle_outline, color: corTema, size: 20),
-                                            const SizedBox(width: 8),
-                                            Text('ADICIONAIS E RECHEIOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
+                                            Row(
+                                              children: [
+                                                Icon(categoria == 'Combos' ? Icons.inventory_2_outlined : Icons.add_circle_outline, color: corTema, size: 20),
+                                                const SizedBox(width: 8),
+                                                Text(categoria == 'Combos' ? 'ITENS INCLUSOS' : 'ADICIONAIS E RECHEIOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
+                                              ],
+                                            ),
+                                            if (maxGratuitos > 0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 6.0, left: 28.0),
+                                                child: Text('Escolha até $maxGratuitos opções grátis.', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 13)),
+                                              ),
                                           ],
                                         ),
                                       ),
                                       const SizedBox(height: 12),
                                       adicionaisDoProduto.isEmpty
-                                          ? const Text('Nenhum adicional vinculado a este produto.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
-                                          : SizedBox(
-                                              height: 160,
-                                              child: ListView.builder(
-                                                scrollDirection: Axis.horizontal,
+                                          ? const Text('Nenhum item adicional vinculado a este produto.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
+                                          : Container(
+                                              height: 280,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: Colors.grey[200]!),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: ListView.separated(
+                                                padding: const EdgeInsets.all(12),
+                                                scrollDirection: Axis.vertical,
                                                 physics: const BouncingScrollPhysics(),
                                                 itemCount: adicionaisDoProduto.length,
+                                                separatorBuilder: (context, index) => const Divider(height: 16),
                                                 itemBuilder: (context, index) {
                                                   final ad = adicionaisDoProduto[index];
                                                   final int adId = ad['id'] ?? ad['ID'];
@@ -389,124 +512,64 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                                   final String imgUrl = ad['image_url'] ?? '';
                                                   final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
 
-                                                  return Container(
-                                                    width: 120,
-                                                    margin: const EdgeInsets.only(right: 12),
-                                                    child: InkWell(
-                                                      onTap: () {
-                                                        setModalState(() {
-                                                          if (adSelecionado) {
-                                                            adicionaisSelecionadosLocais.remove(adId);
-                                                          } else {
-                                                            adicionaisSelecionadosLocais.add(adId);
-                                                          }
-                                                        });
-                                                      },
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      child: AnimatedContainer(
-                                                        duration: const Duration(milliseconds: 200),
-                                                        decoration: BoxDecoration(
-                                                          color: adSelecionado ? corTema.withOpacity(0.15) : Colors.white,
-                                                          border: Border.all(
-                                                            color: adSelecionado ? corTema : Colors.grey[300]!,
-                                                            width: adSelecionado ? 2 : 1,
+                                                  bool isFree = false;
+                                                  if (adSelecionado) {
+                                                    isFree = idsGratuitos.contains(adId);
+                                                  } else {
+                                                    isFree = adicionaisSelecionadosLocais.length < maxGratuitos;
+                                                  }
+                                                  if (adPreco == 0.0) isFree = true;
+
+                                                  String textoPreco = isFree 
+                                                      ? '+R\$ 0,00' 
+                                                      : '+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}';
+
+                                                  return InkWell(
+                                                    onTap: () {
+                                                      setModalState(() {
+                                                        if (adSelecionado) {
+                                                          adicionaisSelecionadosLocais.remove(adId);
+                                                        } else {
+                                                          adicionaisSelecionadosLocais.add(adId);
+                                                        }
+                                                      });
+                                                    },
+                                                    child: Row(
+                                                      children: [
+                                                        ClipRRect(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          child: SizedBox(
+                                                            width: 50, height: 50,
+                                                            child: f.isEmpty || f.first == 'null'
+                                                                ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
+                                                                : CarrosselFotosPublicoWidget(key: ValueKey('ad_modal_$adId'), fotos: f)
+                                                          )
+                                                        ),
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                                              const SizedBox(height: 4),
+                                                              Text(textoPreco, style: TextStyle(color: isFree ? Colors.green[700] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+                                                            ],
                                                           ),
-                                                          borderRadius: BorderRadius.circular(12),
                                                         ),
-                                                        child: Stack(
-                                                          children: [
-                                                            Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                              children: [
-                                                                Expanded(
-                                                                  flex: 5,
-                                                                  child: ClipRRect(
-                                                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                                                                    child: f.isEmpty
-                                                                        ? Container(color: Colors.grey[100], child: Icon(Icons.fastfood, color: Colors.grey[400], size: 30))
-                                                                        : (f.first.startsWith('data:image')
-                                                                            ? Image.memory(base64Decode(f.first.split(',')[1]), fit: BoxFit.cover)
-                                                                            : Image.network(f.first, fit: BoxFit.cover, errorBuilder: (_,__,___) => Icon(Icons.broken_image, color: Colors.grey[400]))),
-                                                                  ),
-                                                                ),
-                                                                Expanded(
-                                                                  flex: 4,
-                                                                  child: Padding(
-                                                                    padding: const EdgeInsets.all(6.0),
-                                                                    child: Column(
-                                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                                      children: [
-                                                                        Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                                                        const Spacer(),
-                                                                        Text('+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 12)),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                )
-                                                              ],
-                                                            ),
-                                                            if (adSelecionado)
-                                                              Positioned(
-                                                                top: 6,
-                                                                right: 6,
-                                                                child: Container(
-                                                                  padding: const EdgeInsets.all(2),
-                                                                  decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
-                                                                  child: Icon(Icons.check, color: corLetras, size: 14),
-                                                                ),
-                                                              )
-                                                          ],
-                                                        ),
-                                                      ),
+                                                        Container(
+                                                          width: 24, height: 24,
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(color: adSelecionado ? corTema : Colors.grey[400]!, width: 2),
+                                                            color: adSelecionado ? corTema : Colors.transparent,
+                                                          ),
+                                                          child: adSelecionado ? Icon(Icons.check, color: corLetras, size: 16) : null,
+                                                        )
+                                                      ],
                                                     ),
                                                   );
                                                 },
                                               ),
-                                            ),
-                                    ],
-                                    if (categoria == 'Combos') ...[
-                                      const SizedBox(height: 24),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.inventory_2_outlined, color: corTema, size: 20),
-                                            const SizedBox(width: 8),
-                                            Text('ITENS DESTE COMBO:', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      subprodutosDoCombo.isEmpty
-                                          ? const Text('Lista vazia.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
-                                          : ListView.separated(
-                                              shrinkWrap: true,
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              itemCount: subprodutosDoCombo.length,
-                                              separatorBuilder: (context, index) => const Divider(height: 1),
-                                              itemBuilder: (context, index) {
-                                                final sub = subprodutosDoCombo[index];
-                                                final String subImg = sub['image_url'] ?? '';
-                                                final List<String> sf = subImg.split('|||').where((s) => s.isNotEmpty).toList();
-                                                return ListTile(
-                                                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                                  leading: Container(
-                                                    width: 50, height: 50,
-                                                    decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                                                    child: ClipRRect(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      child: sf.isEmpty
-                                                        ? Icon(Icons.fastfood, color: Colors.grey[400])
-                                                        : (sf.first.startsWith('data:image') 
-                                                            ? Image.memory(base64Decode(sf.first.split(',')[1]), fit: BoxFit.cover)
-                                                            : Image.network(sf.first, fit: BoxFit.cover)),
-                                                    )
-                                                  ),
-                                                  title: Text(sub['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                                  subtitle: Text((sub['category'] ?? '').toString().toUpperCase(), style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                                                );
-                                              },
                                             ),
                                     ],
                                     const SizedBox(height: 24),
@@ -633,28 +696,45 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                   shrinkWrap: true,
                                   children: [
                                     Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
-                                    if (categoria == 'Açai' || categoria == 'Cremes') ...[
+                                    
+                                    if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
                                       const SizedBox(height: 24),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                                         decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-                                        child: Row(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Icon(Icons.add_circle_outline, color: corTema, size: 20),
-                                            const SizedBox(width: 8),
-                                            Text('ADICIONAIS E RECHEIOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
+                                            Row(
+                                              children: [
+                                                Icon(categoria == 'Combos' ? Icons.inventory_2_outlined : Icons.add_circle_outline, color: corTema, size: 20),
+                                                const SizedBox(width: 8),
+                                                Text(categoria == 'Combos' ? 'ITENS INCLUSOS' : 'ADICIONAIS E RECHEIOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
+                                              ],
+                                            ),
+                                            if (maxGratuitos > 0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 6.0, left: 28.0),
+                                                child: Text('Escolha até $maxGratuitos opções grátis.', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 13)),
+                                              ),
                                           ],
                                         ),
                                       ),
                                       const SizedBox(height: 12),
                                       adicionaisDoProduto.isEmpty
-                                          ? const Text('Nenhum adicional vinculado a este produto.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
-                                          : SizedBox(
-                                              height: 160,
-                                              child: ListView.builder(
-                                                scrollDirection: Axis.horizontal,
+                                          ? const Text('Nenhum item adicional vinculado a este produto.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
+                                          : Container(
+                                              height: 280,
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: Colors.grey[200]!),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: ListView.separated(
+                                                padding: const EdgeInsets.all(12),
+                                                scrollDirection: Axis.vertical,
                                                 physics: const BouncingScrollPhysics(),
                                                 itemCount: adicionaisDoProduto.length,
+                                                separatorBuilder: (context, index) => const Divider(height: 16),
                                                 itemBuilder: (context, index) {
                                                   final ad = adicionaisDoProduto[index];
                                                   final int adId = ad['id'] ?? ad['ID'];
@@ -664,124 +744,64 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                                   final String imgUrl = ad['image_url'] ?? '';
                                                   final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
 
-                                                  return Container(
-                                                    width: 120,
-                                                    margin: const EdgeInsets.only(right: 12),
-                                                    child: InkWell(
-                                                      onTap: () {
-                                                        setModalState(() {
-                                                          if (adSelecionado) {
-                                                            adicionaisSelecionadosLocais.remove(adId);
-                                                          } else {
-                                                            adicionaisSelecionadosLocais.add(adId);
-                                                          }
-                                                        });
-                                                      },
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      child: AnimatedContainer(
-                                                        duration: const Duration(milliseconds: 200),
-                                                        decoration: BoxDecoration(
-                                                          color: adSelecionado ? corTema.withOpacity(0.15) : Colors.white,
-                                                          border: Border.all(
-                                                            color: adSelecionado ? corTema : Colors.grey[300]!,
-                                                            width: adSelecionado ? 2 : 1,
+                                                  bool isFree = false;
+                                                  if (adSelecionado) {
+                                                    isFree = idsGratuitos.contains(adId);
+                                                  } else {
+                                                    isFree = adicionaisSelecionadosLocais.length < maxGratuitos;
+                                                  }
+                                                  if (adPreco == 0.0) isFree = true;
+
+                                                  String textoPreco = isFree 
+                                                      ? '+R\$ 0,00' 
+                                                      : '+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}';
+
+                                                  return InkWell(
+                                                    onTap: () {
+                                                      setModalState(() {
+                                                        if (adSelecionado) {
+                                                          adicionaisSelecionadosLocais.remove(adId);
+                                                        } else {
+                                                          adicionaisSelecionadosLocais.add(adId);
+                                                        }
+                                                      });
+                                                    },
+                                                    child: Row(
+                                                      children: [
+                                                        ClipRRect(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          child: SizedBox(
+                                                            width: 50, height: 50,
+                                                            child: f.isEmpty || f.first == 'null'
+                                                                ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
+                                                                : CarrosselFotosPublicoWidget(key: ValueKey('ad_modal_$adId'), fotos: f)
+                                                          )
+                                                        ),
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                                              const SizedBox(height: 4),
+                                                              Text(textoPreco, style: TextStyle(color: isFree ? Colors.green[700] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+                                                            ],
                                                           ),
-                                                          borderRadius: BorderRadius.circular(12),
                                                         ),
-                                                        child: Stack(
-                                                          children: [
-                                                            Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                              children: [
-                                                                Expanded(
-                                                                  flex: 5,
-                                                                  child: ClipRRect(
-                                                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                                                                    child: f.isEmpty
-                                                                        ? Container(color: Colors.grey[100], child: Icon(Icons.fastfood, color: Colors.grey[400], size: 30))
-                                                                        : (f.first.startsWith('data:image')
-                                                                            ? Image.memory(base64Decode(f.first.split(',')[1]), fit: BoxFit.cover)
-                                                                            : Image.network(f.first, fit: BoxFit.cover, errorBuilder: (_,__,___) => Icon(Icons.broken_image, color: Colors.grey[400]))),
-                                                                  ),
-                                                                ),
-                                                                Expanded(
-                                                                  flex: 4,
-                                                                  child: Padding(
-                                                                    padding: const EdgeInsets.all(6.0),
-                                                                    child: Column(
-                                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                                      children: [
-                                                                        Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                                                        const Spacer(),
-                                                                        Text('+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 12)),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                )
-                                                              ],
-                                                            ),
-                                                            if (adSelecionado)
-                                                              Positioned(
-                                                                top: 6,
-                                                                right: 6,
-                                                                child: Container(
-                                                                  padding: const EdgeInsets.all(2),
-                                                                  decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
-                                                                  child: Icon(Icons.check, color: corLetras, size: 14),
-                                                                ),
-                                                              )
-                                                          ],
-                                                        ),
-                                                      ),
+                                                        Container(
+                                                          width: 24, height: 24,
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(color: adSelecionado ? corTema : Colors.grey[400]!, width: 2),
+                                                            color: adSelecionado ? corTema : Colors.transparent,
+                                                          ),
+                                                          child: adSelecionado ? Icon(Icons.check, color: corLetras, size: 16) : null,
+                                                        )
+                                                      ],
                                                     ),
                                                   );
                                                 },
                                               ),
-                                            ),
-                                    ],
-                                    if (categoria == 'Combos') ...[
-                                      const SizedBox(height: 24),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.inventory_2_outlined, color: corTema, size: 20),
-                                            const SizedBox(width: 8),
-                                            Text('ITENS DESTE COMBO:', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      subprodutosDoCombo.isEmpty
-                                          ? const Text('Lista vazia.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
-                                          : ListView.separated(
-                                              shrinkWrap: true,
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              itemCount: subprodutosDoCombo.length,
-                                              separatorBuilder: (context, index) => const Divider(height: 1),
-                                              itemBuilder: (context, index) {
-                                                final sub = subprodutosDoCombo[index];
-                                                final String subImg = sub['image_url'] ?? '';
-                                                final List<String> sf = subImg.split('|||').where((s) => s.isNotEmpty).toList();
-                                                return ListTile(
-                                                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                                  leading: Container(
-                                                    width: 50, height: 50,
-                                                    decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                                                    child: ClipRRect(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      child: sf.isEmpty
-                                                        ? Icon(Icons.fastfood, color: Colors.grey[400])
-                                                        : (sf.first.startsWith('data:image') 
-                                                            ? Image.memory(base64Decode(sf.first.split(',')[1]), fit: BoxFit.cover)
-                                                            : Image.network(sf.first, fit: BoxFit.cover)),
-                                                    )
-                                                  ),
-                                                  title: Text(sub['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                                  subtitle: Text((sub['category'] ?? '').toString().toUpperCase(), style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                                                );
-                                              },
                                             ),
                                     ],
                                     const SizedBox(height: 24),
@@ -894,6 +914,9 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
       onTap: () => setState(() {
         _categoriaSelecionada = aba;
         _paginaAtual = 1;
+        _termoBusca = '';
+        _searchController.clear();
+        _isSearching = false; 
       }),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -924,8 +947,8 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                   child: imgUrl == null
                       ? Image.asset('assets/images/logo.jpg', fit: BoxFit.cover, key: ValueKey('asset_$aba'))
                       : imgUrl.startsWith('data:image')
-                          ? Image.memory(base64Decode(imgUrl.split(',')[1]), fit: BoxFit.cover, key: ValueKey('mem_circle_$aba'))
-                          : Image.network(imgUrl, fit: BoxFit.cover, key: ValueKey('net_circle_$aba'), errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)),
+                          ? Image.memory(base64Decode(imgUrl.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true, key: ValueKey('mem_circle_$aba'))
+                          : Image.network(imgUrl, fit: BoxFit.cover, gaplessPlayback: true, key: ValueKey('net_circle_$aba'), errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)),
                 ),
               ),
             ),
@@ -989,6 +1012,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     final corTema = _hexToColor(_catalogo!['cor_tema'] ?? '#4A0E4E');
     final corLetras = _hexToColor(_catalogo!['cor_letras'] ?? '#FFFFFF');
     final String fotoCapa = _catalogo!['foto_capa'] ?? '';
+    final String nomeEmpresa = _catalogo!['titulo'] ?? 'Açaiteria Shalom';
 
     final todosFiltrados = _filtrarProdutos();
     
@@ -998,6 +1022,15 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     
     final produtosPaginados = todosFiltrados.isEmpty ? [] : todosFiltrados.sublist(inicioIdx, fimIdx);
     final bool atingeMinimo = _valorTotalCarrinho >= _pedidoMinimo;
+
+    final String sloganEmpresa = _empresa?['slogan']?.toString() ?? _empresa?['descricao']?.toString() ?? 'Diretamente do Pará, o melhor açaí da região!';
+    final String ruaEmpresa = _empresa?['logradouro']?.toString() ?? 'Rua Josias Gondim';
+    final String numEmpresa = _empresa?['numero']?.toString() ?? '711';
+    final String bairroEmpresa = _empresa?['bairro']?.toString() ?? 'Santa Clara';
+    final String cidadeEmpresa = _empresa?['cidade']?.toString() ?? 'Canindé';
+    final String ufEmpresa = _empresa?['uf']?.toString() ?? 'CE';
+    final String instaEmpresa = _empresa?['instagram']?.toString() ?? '@acaiteriashalom2026';
+    final String enderecoCompleto = '$ruaEmpresa - $numEmpresa\n$bairroEmpresa, $cidadeEmpresa - $ufEmpresa';
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -1020,7 +1053,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                (_catalogo!['titulo'] ?? '').toUpperCase(), 
+                nomeEmpresa.toUpperCase(), 
                 style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: isMobile ? 16 : 22, letterSpacing: 0.5),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1068,289 +1101,318 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
           const SizedBox(width: 12),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              height: isMobile ? 240 : 420, 
-              decoration: BoxDecoration(color: corTema.withOpacity(0.1)),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (fotoCapa.isNotEmpty)
-                    fotoCapa.startsWith('data:image') 
-                      ? Image.memory(base64Decode(fotoCapa.split(',')[1]), fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox()) 
-                      : Image.network(fotoCapa, fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox())
-                  else
-                    Center(child: Icon(Icons.image, size: 80, color: corTema.withOpacity(0.3))),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.85)],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 24, 
-                    left: isMobile ? 16 : 40,
-                    right: 16,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_catalogo!['titulo'] ?? '', style: TextStyle(color: Colors.white, fontSize: isMobile ? 28 : 48, fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 4),
-                        Text(_catalogo!['descricao'] ?? '', style: TextStyle(color: Colors.white70, fontSize: isMobile ? 14 : 18)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_isSearching)
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Digite o nome do produto...',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        onSubmitted: (v) {
-                          setState(() {
-                            _termoBusca = v;
-                            _paginaAtual = 1;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: corTema,
-                        foregroundColor: corLetras,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _termoBusca = _searchController.text.trim();
-                          _paginaAtual = 1;
-                        });
-                      },
-                      child: const Icon(Icons.search),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _termoBusca = '';
-                          _isSearching = false;
-                          _paginaAtual = 1;
-                        });
-                      },
-                      child: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 110,
-              child: Center(
-                child: ListView(
-                  shrinkWrap: true,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  children: _abasFiltro.map((aba) => _buildCircleFiltroItem(aba, corTema)).toList(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 1400),
-              padding: EdgeInsets.symmetric(vertical: isMobile ? 20 : 32, horizontal: isMobile ? 16 : 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: isMobile ? 220 : 380, 
+                  decoration: BoxDecoration(color: corTema.withOpacity(0.1)),
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(Icons.restaurant_menu, color: corTema, size: isMobile ? 22 : 28),
-                      const SizedBox(width: 8),
-                      Text(
-                        _categoriaSelecionada == 'Tudo' ? 'NOSSO CARDÁPIO COMPLETO' : 'CATEGORIA: ${_categoriaSelecionada.toUpperCase()}', 
-                        style: TextStyle(fontSize: isMobile ? 18 : 24, fontWeight: FontWeight.w900, color: corTema),
+                      if (fotoCapa.isNotEmpty)
+                        fotoCapa.startsWith('data:image') 
+                          ? Image.memory(base64Decode(fotoCapa.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_,__,___) => const SizedBox()) 
+                          : Image.network(fotoCapa, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_,__,___) => const SizedBox())
+                      else
+                        Center(child: Icon(Icons.image, size: 80, color: corTema.withOpacity(0.3))),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                            colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.9)], 
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 24, 
+                        left: isMobile ? 16 : 40,
+                        right: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(nomeEmpresa, style: TextStyle(color: Colors.white, fontSize: isMobile ? 28 : 48, fontWeight: FontWeight.w900)),
+                            const SizedBox(height: 4),
+                            Text(_catalogo!['descricao'] ?? '', style: TextStyle(color: Colors.white70, fontSize: isMobile ? 14 : 18)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  if (produtosPaginados.isEmpty)
-                    SizedBox(
-                      height: 220,
-                      child: Center(child: Text('Nenhum produto encontrado.', style: TextStyle(color: Colors.grey[600], fontSize: 15))),
-                    )
-                  else
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: screenWidth > 1100 ? 4 : (screenWidth > 750 ? 3 : 2), crossAxisSpacing: isMobile ? 12 : 24, mainAxisSpacing: isMobile ? 12 : 24, childAspectRatio: isMobile ? 0.63 : 0.68,
-                      ),
-                      itemCount: produtosPaginados.length,
-                      itemBuilder: (context, index) {
-                        final p = produtosPaginados[index];
-                        final String nome = p['name'] ?? '';
-                        final String desc = p['description'] ?? '';
-                        final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
-                        final int pId = p['id'] ?? p['ID'] ?? index;
-                        final String urlCompleta = (p['image_url'] ?? '').toString();
-                        final List<String> fotos = urlCompleta == 'null' ? [] : urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
-
-                        return Card(
-                          color: Colors.white, 
-                          elevation: _hoveredIndex == index && !isMobile ? 12 : 3,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          clipBehavior: Clip.antiAlias, 
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: MouseRegion(
-                                  onEnter: (_) => setState(() => _hoveredIndex = index),
-                                  onExit: (_) => setState(() => _hoveredIndex = null),
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: fotos.isEmpty
-                                        ? Icon(Icons.fastfood, size: 40, color: corTema.withOpacity(0.2))
-                                        : CarrosselFotosPublicoWidget(
-                                            key: ValueKey('grid_${pId}_$_categoriaSelecionada'),
-                                            fotos: fotos,
-                                          ),
-                                  ),
-                                ),
+                ),
+                if (_isSearching)
+                  Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Digite o nome do produto...',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                               ),
-                              Padding(
-                                padding: EdgeInsets.all(isMobile ? 10.0 : 16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(nome, style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 14 : 16, color: corTema), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 2),
-                                    Text(desc, style: TextStyle(color: Colors.grey[700], fontSize: isMobile ? 11 : 13), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 6),
-                                    Text('R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: isMobile ? 15 : 18)),
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 34,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: corTema),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                        onPressed: () => _mostrarDetalhesProduto(p, corTema, corLetras, isMobile),
-                                        child: Text('VER OPÇÕES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 11)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  _buildControlePaginacao(todosFiltrados.length, corTema),
-                ],
-              ),
-            ),
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF151515),
-              padding: EdgeInsets.symmetric(vertical: isMobile ? 40 : 60, horizontal: isMobile ? 24 : 60),
-              child: Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: isMobile
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(width: 60, height: 60, decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover))),
-                            const SizedBox(height: 16),
-                            Text("Açaiteria Shalom", style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 24)),
-                            const SizedBox(height: 12),
-                            const Text('Diretamente do Pará, o melhor açaí aqui em Canindé. Açaí Premium, Cremes diversos e Gelatos Italianos!', style: TextStyle(color: Colors.grey, height: 1.5, fontSize: 14), textAlign: TextAlign.center),
-                            const SizedBox(height: 32),
-                            Text('LOCALIZAÇÃO E REDES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.2)),
-                            const SizedBox(height: 12),
-                            const Text('Rua Josias Gondim - 711\nSanta Clara, Canindé - CE', style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5), textAlign: TextAlign.center),
-                            const SizedBox(height: 8),
-                            const Text('Instagram: @acaiteriashalom2026', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(width: 50, height: 50, decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover))),
-                                      const SizedBox(width: 16),
-                                      Text("Açaiteria Shalom", style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 22)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text('Diretamente do Pará, o melhor açaí aqui em Canindé.\nAçaí Premium, Cremes diversos e Gelatos Italianos!', style: TextStyle(color: Colors.grey, height: 1.6, fontSize: 14)),
-                                ],
-                              ),
+                              onSubmitted: (v) {
+                                setState(() {
+                                  _termoBusca = v;
+                                  _paginaAtual = 1;
+                                });
+                              },
                             ),
-                            Expanded(
-                              flex: 4,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('LOCALIZAÇÃO E REDES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
-                                  const SizedBox(height: 16),
-                                  const Text('Rua Josias Gondim - 711\nSanta Clara, Canindé - CE', style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5), textAlign: TextAlign.right),
-                                  const SizedBox(height: 8),
-                                  const Text('Instagram: @acaiteriashalom2026', style: TextStyle(color: Colors.white70, fontSize: 14), textAlign: TextAlign.right),
-                                ],
-                              ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: corTema,
+                              foregroundColor: corLetras,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _termoBusca = _searchController.text.trim();
+                                _paginaAtual = 1;
+                              });
+                            },
+                            child: const Icon(Icons.search),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _termoBusca = '';
+                                _isSearching = false;
+                                _paginaAtual = 1;
+                              });
+                            },
+                            child: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 110,
+                  child: Center(
+                    child: ListView(
+                      shrinkWrap: true,
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      children: _abasFiltro.map((aba) => _buildCircleFiltroItem(aba, corTema)).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    padding: EdgeInsets.symmetric(vertical: isMobile ? 20 : 32, horizontal: isMobile ? 16 : 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.restaurant_menu, color: corTema, size: isMobile ? 22 : 28),
+                            const SizedBox(width: 8),
+                            Text(
+                              _categoriaSelecionada == 'Tudo' ? 'NOSSO CARDÁPIO COMPLETO' : 'CATEGORIA: ${_categoriaSelecionada.toUpperCase()}', 
+                              style: TextStyle(fontSize: isMobile ? 18 : 24, fontWeight: FontWeight.w900, color: corTema),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 24),
+                        if (produtosPaginados.isEmpty)
+                          SizedBox(
+                            height: 220,
+                            child: Center(child: Text('Nenhum produto encontrado.', style: TextStyle(color: Colors.grey[600], fontSize: 15))),
+                          )
+                        else
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: screenWidth > 1300 ? 4 : (screenWidth > 900 ? 3 : 2), 
+                              crossAxisSpacing: isMobile ? 12 : 24, 
+                              mainAxisSpacing: isMobile ? 12 : 24, 
+                              childAspectRatio: isMobile ? 0.70 : 0.78, 
+                            ),
+                            itemCount: produtosPaginados.length,
+                            itemBuilder: (context, index) {
+                              final p = produtosPaginados[index];
+                              final String nome = p['name'] ?? '';
+                              final String desc = p['description'] ?? '';
+                              final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
+                              final String urlCompleta = (p['image_url'] ?? '').toString();
+                              final int pId = p['id'] ?? p['ID'] ?? index;
+                              
+                              return Card(
+                                color: Colors.white, 
+                                elevation: _hoveredIndex == index && !isMobile ? 12 : 3,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                clipBehavior: Clip.antiAlias, 
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: MouseRegion(
+                                        onEnter: (_) => setState(() => _hoveredIndex = index),
+                                        onExit: (_) => setState(() => _hoveredIndex = null),
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          child: CarrosselFotosPublicoWidget(
+                                              key: ValueKey('grid_${pId}_$_categoriaSelecionada'),
+                                              fotos: urlCompleta == 'null' ? [] : urlCompleta.split('|||').where((s) => s.isNotEmpty).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(isMobile ? 10.0 : 16.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(nome, style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 14 : 16, color: corTema), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          const SizedBox(height: 2),
+                                          Text(desc, style: TextStyle(color: Colors.grey[700], fontSize: isMobile ? 11 : 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                          const SizedBox(height: 6),
+                                          Text('R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: isMobile ? 15 : 18)),
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 34,
+                                            child: OutlinedButton(
+                                              style: OutlinedButton.styleFrom(
+                                                side: BorderSide(color: corTema),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                              onPressed: () => _mostrarDetalhesProduto(p, corTema, corLetras, isMobile),
+                                              child: Text('VER OPÇÕES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 11)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        _buildControlePaginacao(todosFiltrados.length, corTema),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  color: const Color(0xFF151515),
+                  padding: EdgeInsets.symmetric(vertical: isMobile ? 40 : 60, horizontal: isMobile ? 24 : 60),
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: isMobile
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(width: 60, height: 60, decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover))),
+                                const SizedBox(height: 16),
+                                Text(nomeEmpresa, style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 24)),
+                                const SizedBox(height: 12),
+                                Text(sloganEmpresa, style: const TextStyle(color: Colors.grey, height: 1.5, fontSize: 14), textAlign: TextAlign.center),
+                                const SizedBox(height: 32),
+                                Text('LOCALIZAÇÃO E REDES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.2)),
+                                const SizedBox(height: 12),
+                                Text(enderecoCompleto, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5), textAlign: TextAlign.center),
+                                const SizedBox(height: 8),
+                                Text('Instagram: $instaEmpresa', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                              ],
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(width: 50, height: 50, decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover))),
+                                          const SizedBox(width: 16),
+                                          Text(nomeEmpresa, style: TextStyle(color: corLetras, fontWeight: FontWeight.w900, fontSize: 22)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(sloganEmpresa, style: const TextStyle(color: Colors.grey, height: 1.6, fontSize: 14)),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 4,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text('LOCALIZAÇÃO E REDES', style: TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
+                                      const SizedBox(height: 16),
+                                      Text(enderecoCompleto, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5), textAlign: TextAlign.right),
+                                      const SizedBox(height: 8),
+                                      Text('Instagram: $instaEmpresa', style: const TextStyle(color: Colors.white70, fontSize: 14), textAlign: TextAlign.right),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  color: Colors.black,
+                  padding: EdgeInsets.only(top: 24, bottom: _quantidadeTotalItens > 0 ? 120 : 40),
+                  child: Center(
+                    child: Text('Desenvolvido por Pedro Barros • 2026', style: TextStyle(color: corTema.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold))
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Positioned(
+            bottom: _quantidadeTotalItens > 0 ? (isMobile ? 100 : 120) : 32,
+            right: 24,
+            child: FloatingActionButton(
+              heroTag: 'whatsapp_button',
+              backgroundColor: const Color(0xFF25D366), 
+              elevation: 6,
+              onPressed: _abrirWhatsApp,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/whatspp.jpeg', 
+                  width: 36, 
+                  height: 36, 
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.chat, color: Colors.white),
                 ),
               ),
             ),
-            Container(
-              width: double.infinity,
-              color: Colors.black,
-              padding: EdgeInsets.only(top: 24, bottom: _quantidadeTotalItens > 0 ? 96 : 24),
-              child: Center(
-                child: Text('Desenvolvido por Pedro Barros • 2026', style: TextStyle(color: corTema.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold))
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _quantidadeTotalItens > 0
@@ -1451,47 +1513,51 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
     super.dispose();
   }
 
+  Widget _buildSingleImage(String foto, int index) {
+    if (foto.startsWith('data:image')) {
+      if (_cachedBytes.length > index) {
+        return Image.memory(_cachedBytes[index], fit: BoxFit.cover, gaplessPlayback: true);
+      }
+      try {
+        return Image.memory(base64Decode(foto.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true);
+      } catch (_) {
+        return Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey));
+      }
+    }
+    return Image.network(
+      foto, 
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (c, e, s) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.fotos.isEmpty) {
+      return Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey));
+    }
+    if (widget.fotos.length == 1) {
+      return _buildSingleImage(widget.fotos.first, 0);
+    }
+
     return MouseRegion(
       onEnter: (_) => _iniciarCarrossel(),
       onExit: (_) => _pararCarrossel(),
       child: GestureDetector(
-        onTapDown: (_) => _iniciarChaveOuCarrossel(),
+        onTapDown: (_) => _iniciarCarrossel(),
         onTapUp: (_) => _pararCarrossel(),
         onTapCancel: () => _pararCarrossel(),
         child: PageView.builder(
           controller: _pageController,
-          physics: widget.fotos.length > 1 ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           itemCount: widget.fotos.length,
           onPageChanged: (index) => _currentPage = index,
           itemBuilder: (context, index) {
-            final String foto = widget.fotos[index];
-            
-            if (foto.startsWith('data:image')) {
-              if (_cachedBytes.length > index) {
-                return Image.memory(_cachedBytes[index], fit: BoxFit.cover, key: ValueKey('memory_${index}_${widget.fotos.length}'));
-              }
-              try {
-                return Image.memory(base64Decode(foto.split(',')[1]), fit: BoxFit.cover, key: ValueKey('memory_fallback_${index}'));
-              } catch (_) {
-                return Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey));
-              }
-            }
-            
-            return Image.network(
-              foto, 
-              fit: BoxFit.cover,
-              key: ValueKey('network_${foto.hashCode}_${index}'),
-              errorBuilder: (c, e, s) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover, key: ValueKey('asset_err_$index')),
-            );
+            return _buildSingleImage(widget.fotos[index], index);
           },
         ),
       ),
     );
-  }
-
-  void _iniciarChaveOuCarrossel() {
-    _iniciarCarrossel();
   }
 }

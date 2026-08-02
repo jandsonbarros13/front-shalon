@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:acaiteria_front/core/constants/api_constants.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
 import 'package:acaiteria_front/features/auth/services/produto_cache.dart';
+import 'package:acaiteria_front/features/auth/services/imgbb_service.dart';
 
 class CadastroProdutoPage extends StatefulWidget {
   final Map<String, dynamic>? produtoParaEditar;
@@ -25,138 +27,177 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   final _precoController = TextEditingController();
   final _estoqueController = TextEditingController();
   final _buscaFiltroController = TextEditingController();
+  final _maxAdicionaisGratuitosController = TextEditingController(text: '0');
 
   List<String> _fotos = [];
   String _unidadeMedida = 'Unidade';
   String _categoria = 'Açai';
   bool _isSaving = false;
-  bool _loadingFotoEdicao = false;
+  bool _loadingDados = false; 
+  bool _isUploadingImage = false;
 
-  List<dynamic> _todosAdicionaisCache = [];
-  List<dynamic> _todosProdutosComboCache = [];
   List<dynamic> _resultadosBusca = [];
   bool _buscaRealizada = false;
 
   final List<int> _adicionaisSelecionadosIds = [];
   final List<int> _produtosComboSelecionadosIds = [];
 
-  final List<String> _categorias = ['Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
+  List<String> _categorias = ['Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
   final List<String> _unidades = ['Unidade', 'Kg', 'Grama'];
 
   @override
   void initState() {
     super.initState();
-    _carregarCacheEInicializarFormulario();
+    _inicializarFormulario();
   }
 
-  Future<void> _carregarCacheEInicializarFormulario() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cacheAdicionais = prefs.getString('cache_json_adicionais');
-    final cacheCombos = prefs.getString('cache_json_combos');
-
-    if (cacheAdicionais != null && cacheCombos != null) {
-      _todosAdicionaisCache = jsonDecode(cacheAdicionais);
-      _todosProdutosComboCache = jsonDecode(cacheCombos);
-      _atualizarCacheBackground(prefs); 
-    } else {
-      await _atualizarCacheBackground(prefs);
-    }
+  Future<void> _inicializarFormulario() async {
+    await _carregarCategorias();
 
     if (widget.produtoParaEditar != null) {
-      setState(() => _loadingFotoEdicao = true);
-      final p = widget.produtoParaEditar!;
-      _nomeController.text = p['name'] ?? '';
-      _descricaoController.text = p['description'] ?? '';
-      _precoController.text = (p['price'] ?? '').toString();
-      _estoqueController.text = (p['estoque'] ?? '').toString();
+      setState(() => _loadingDados = true);
       
-      String catOriginal = p['category'] ?? 'Açai';
-      if (_categorias.contains(catOriginal)) {
-        _categoria = catOriginal;
-      } else {
-        _categoria = 'Açai';
-      }
-
-      String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
-      if (un == 'kg' || un == 'quilo') {
-        _unidadeMedida = 'Kg';
-      } else if (un == 'grama' || un == 'g') {
-        _unidadeMedida = 'Grama';
-      } else {
-        _unidadeMedida = 'Unidade';
-      }
-
-      if (p['adicionais_ids'] != null) {
-        for (var id in p['adicionais_ids']) {
-          _adicionaisSelecionadosIds.add(id as int);
-        }
-      }
-      if (p['combo_itens_ids'] != null) {
-        for (var id in p['combo_itens_ids']) {
-          _produtosComboSelecionadosIds.add(id as int);
-        }
-      }
-
-      _mostrarSelecionadosPorPadrao();
-
-      String imgUrl = p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '';
-      if (imgUrl.isNotEmpty) {
-        _fotos = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
-      }
-
-      if (mounted) {
-        setState(() => _loadingFotoEdicao = false);
-      }
-    }
-  }
-
-  Future<void> _atualizarCacheBackground(SharedPreferences prefs) async {
-    try {
-      final resultado = await _produtoService.buscarProdutos(1, limit: 1000);
-      final todos = resultado['produtos'] as List? ?? [];
-      if (todos.isNotEmpty) {
-        _todosAdicionaisCache = todos.where((p) => p['category'] == 'Adicionais' || p['Category'] == 'Adicionais').toList();
-        _todosProdutosComboCache = todos.where((p) => p['category'] != 'Combos' && p['Category'] != 'Combos').toList();
+      final idStr = widget.produtoParaEditar!['id'] ?? widget.produtoParaEditar!['ID'];
+      final int id = int.tryParse(idStr.toString()) ?? 0;
+      
+      final p = await _produtoService.buscarProdutoPorId(id) ?? widget.produtoParaEditar!;
+      
+      setState(() {
+        _nomeController.text = p['name'] ?? p['Name'] ?? '';
+        _descricaoController.text = p['description'] ?? p['Description'] ?? '';
+        _precoController.text = (p['price'] ?? p['Price'] ?? '').toString();
+        _estoqueController.text = (p['estoque'] ?? p['Estoque'] ?? '').toString();
+        _maxAdicionaisGratuitosController.text = (p['max_adicionais_gratuitos'] ?? 0).toString();
         
-        await prefs.setString('cache_json_adicionais', jsonEncode(_todosAdicionaisCache));
-        await prefs.setString('cache_json_combos', jsonEncode(_todosProdutosComboCache));
-      }
-    } catch (_) {}
-  }
+        String catOriginal = p['category'] ?? p['Category'] ?? 'Açai';
+        if (!_categorias.contains(catOriginal) && catOriginal.isNotEmpty) {
+          _categorias.add(catOriginal);
+          _categorias.sort();
+        }
+        _categoria = catOriginal.isEmpty ? 'Açai' : catOriginal;
 
-  void _mostrarSelecionadosPorPadrao() {
-    setState(() {
-      _buscaRealizada = true;
-      if (_categoria == 'Açai' || _categoria == 'Cremes') {
-        _resultadosBusca = _todosAdicionaisCache.where((ad) => _adicionaisSelecionadosIds.contains(ad['id'] ?? ad['ID'])).toList();
-      } else if (_categoria == 'Combos') {
-        _resultadosBusca = _todosProdutosComboCache.where((prod) => _produtosComboSelecionadosIds.contains(prod['id'] ?? prod['ID'])).toList();
-      }
-    });
-  }
+        String un = (p['unidade_medida'] ?? p['UnidadeMedida'] ?? '').toString().toLowerCase();
+        if (un == 'kg' || un == 'quilo') {
+          _unidadeMedida = 'Kg';
+        } else if (un == 'grama' || un == 'g') {
+          _unidadeMedida = 'Grama';
+        } else {
+          _unidadeMedida = 'Unidade';
+        }
 
-  void _executarPesquisa() {
-    final termo = _buscaFiltroController.text.trim().toLowerCase();
-    
-    if (termo.isEmpty) {
-      _mostrarSelecionadosPorPadrao();
-      return;
+        _adicionaisSelecionadosIds.clear();
+        if (p['adicionais_ids'] != null) {
+          for (var item in p['adicionais_ids']) {
+            final val = int.tryParse(item.toString());
+            if (val != null) _adicionaisSelecionadosIds.add(val);
+          }
+        }
+        
+        _produtosComboSelecionadosIds.clear();
+        if (p['combo_itens_ids'] != null) {
+          for (var item in p['combo_itens_ids']) {
+            final val = int.tryParse(item.toString());
+            if (val != null) _produtosComboSelecionadosIds.add(val);
+          }
+        }
+
+        _fotos.clear();
+        String imgUrl = p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '';
+        if (imgUrl.isNotEmpty && imgUrl != 'null') {
+          _fotos = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
+        }
+      });
     }
 
-    setState(() {
-      _buscaRealizada = true;
-      if (_categoria == 'Açai' || _categoria == 'Cremes') {
-        _resultadosBusca = _todosAdicionaisCache.where((ad) {
-          final nome = (ad['name'] ?? ad['Name'] ?? '').toString().toLowerCase();
-          return nome.contains(termo) || _adicionaisSelecionadosIds.contains(ad['id'] ?? ad['ID']);
-        }).toList();
-      } else if (_categoria == 'Combos') {
-        _resultadosBusca = _todosProdutosComboCache.where((prod) {
-          final nome = (prod['name'] ?? prod['Name'] ?? '').toString().toLowerCase();
-          return nome.contains(termo) || _produtosComboSelecionadosIds.contains(prod['id'] ?? prod['ID']);
-        }).toList();
+    await _executarPesquisaAPI();
+  }
+
+  Future<void> _carregarCategorias() async {
+    try {
+      String urlBaseLimpa = ApiConstants.baseUrl.trim();
+      if (urlBaseLimpa.endsWith('/')) {
+        urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 1);
       }
-    });
+      if (urlBaseLimpa.endsWith('/api')) {
+        urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 4);
+      }
+
+      final url = Uri.parse('$urlBaseLimpa/api/categorias');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> dados = jsonDecode(response.body);
+        Set<String> catSet = {};
+        for (var item in dados) {
+          if (item['nome'] != null) {
+            catSet.add(item['nome'].toString().trim());
+          }
+        }
+        
+        if (mounted) {
+          setState(() {
+            if (catSet.isNotEmpty) {
+              _categorias = catSet.toList()..sort();
+            }
+            if (!_categorias.contains(_categoria) && _categorias.isNotEmpty) {
+              _categoria = _categorias.first;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar categorias da API: $e');
+    }
+  }
+
+  Future<String?> _mostrarDialogNovaCategoria() {
+    TextEditingController ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nova Categoria'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            hintText: 'Ex: Sobremesas', 
+            border: OutlineInputBorder()
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text('Cancelar')
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), 
+            child: const Text('Adicionar')
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executarPesquisaAPI() async {
+    final termo = _buscaFiltroController.text.trim();
+    
+    String catBusca = '';
+    if (_categoria == 'Açai' || _categoria == 'Cremes') {
+      catBusca = 'Adicionais';
+    }
+
+    setState(() => _loadingDados = true);
+
+    final resultado = await _produtoService.buscarProdutos(1, nome: termo, categoria: catBusca, limit: 30);
+    
+    if (mounted) {
+      setState(() {
+        _resultadosBusca = resultado['produtos'] ?? [];
+        _buscaRealizada = true;
+        _loadingDados = false;
+      });
+    }
   }
 
   @override
@@ -166,18 +207,39 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     _precoController.dispose();
     _estoqueController.dispose();
     _buscaFiltroController.dispose();
+    _maxAdicionaisGratuitosController.dispose();
     super.dispose();
   }
 
   Future<void> _escolherFoto() async {
     final picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
+    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    
     if (pickedFile != null) {
-      final bytes = await pickedFile.readAsBytes();
-      final base64Image = 'data:${pickedFile.mimeType ?? "image/jpeg"};base64,${base64Encode(bytes)}';
-      setState(() {
-        _fotos.add(base64Image);
-      });
+      setState(() => _isUploadingImage = true); 
+      
+      try {
+        final bytes = await pickedFile.readAsBytes();
+        final rawBase64 = base64Encode(bytes); 
+
+        final urlHospedada = await ImgbbService.uploadImage(rawBase64);
+
+        if (urlHospedada != null) {
+          setState(() {
+            _fotos.add(urlHospedada); 
+          });
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Falha ao subir imagem pro servidor.'), backgroundColor: Colors.red)
+            );
+          }
+        }
+      } catch (e) {
+        print("Erro ao processar a imagem: $e");
+      } finally {
+        setState(() => _isUploadingImage = false); 
+      }
     }
   }
 
@@ -195,6 +257,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
       'unidade_medida': _unidadeMedida,
       'price': double.tryParse(precoLimpo) ?? 0.0,
       'estoque': int.tryParse(_estoqueController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+      'max_adicionais_gratuitos': int.tryParse(_maxAdicionaisGratuitosController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
       'image_url': _fotos.join('|||'),
       'size': '',
       'is_destaque': false,
@@ -221,44 +284,6 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar o produto.'), backgroundColor: Colors.red));
     }
-  }
-
-  Widget _buildCardSelecao(int id, String nome, String labelExtra, String imgUrl, bool selecionado, VoidCallback onTap) {
-    List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        width: 130,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: selecionado ? const Color(0xFFFFD700).withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selecionado ? const Color(0xFFFFD700) : Colors.grey[300]!, width: selecionado ? 2 : 1),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 55, height: 50,
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(6)),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: f.isEmpty
-                    ? const Icon(Icons.fastfood_outlined, color: Color(0xFF4A0E4E), size: 20)
-                    : f.first.startsWith('data:image')
-                        ? Image.memory(base64Decode(f.first.split(',')[1]), fit: BoxFit.cover)
-                        : Image.network(f.first, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(nome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(labelExtra, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -294,15 +319,42 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _categoria,
+                            value: _categorias.contains(_categoria) ? _categoria : (_categorias.isNotEmpty ? _categorias.first : null),
                             decoration: const InputDecoration(labelText: 'Categoria', prefixIcon: Icon(Icons.category_outlined, color: corTema), border: OutlineInputBorder()),
-                            items: _categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                            onChanged: (v) => setState(() { 
-                              _categoria = v!; 
-                              _buscaFiltroController.clear();
-                              _buscaRealizada = false;
-                              _resultadosBusca.clear();
-                            }),
+                            items: [
+                              ..._categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                              const DropdownMenuItem(
+                                value: 'nova_categoria', 
+                                child: Row(children: [Icon(Icons.add_circle_outline, size: 18, color: corTema), SizedBox(width: 8), Text('Nova Categoria...', style: TextStyle(color: corTema, fontWeight: FontWeight.bold))])
+                              ),
+                            ],
+                            onChanged: (v) async {
+                              if (v == 'nova_categoria') {
+                                String? nova = await _mostrarDialogNovaCategoria();
+                                if (nova != null && nova.isNotEmpty) {
+                                  setState(() {
+                                    String formatada = nova[0].toUpperCase() + nova.substring(1);
+                                    if (!_categorias.contains(formatada)) {
+                                      _categorias.add(formatada);
+                                      _categorias.sort();
+                                    }
+                                    _categoria = formatada;
+                                    _buscaFiltroController.clear();
+                                    _resultadosBusca.clear();
+                                    _executarPesquisaAPI();
+                                  });
+                                } else {
+                                  setState(() {}); 
+                                }
+                              } else {
+                                setState(() { 
+                                  _categoria = v!; 
+                                  _buscaFiltroController.clear();
+                                  _resultadosBusca.clear();
+                                  _executarPesquisaAPI();
+                                });
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -341,8 +393,22 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                         ),
                       ],
                     ),
-                    if (_categoria == 'Açai' || _categoria == 'Combos' || _categoria == 'Cremes') ...[
+                    const SizedBox(height: 16),
+                    if (_categoria == 'Açai' || _categoria == 'Cremes') ...[
+                      TextFormField(
+                        controller: _maxAdicionaisGratuitosController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: const InputDecoration(
+                          labelText: 'Qtd. de Adicionais Gratuitos',
+                          helperText: 'Ex: 3 (Os 3 primeiros são grátis, o 4º em diante cobra o valor do item)',
+                          prefixIcon: Icon(Icons.star_outline, color: corTema),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
                       const SizedBox(height: 16),
+                    ],
+                    if (_categoria == 'Açai' || _categoria == 'Combos' || _categoria == 'Cremes') ...[
                       const Divider(),
                       const SizedBox(height: 8),
                       Text((_categoria == 'Açai' || _categoria == 'Cremes') ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: const TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -357,7 +423,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               ),
-                              onSubmitted: (_) => _executarPesquisa(),
+                              onSubmitted: (_) => _executarPesquisaAPI(),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -365,7 +431,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                             height: 48,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              onPressed: _executarPesquisa,
+                              onPressed: _executarPesquisaAPI,
                               icon: const Icon(Icons.search),
                               label: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
@@ -373,31 +439,83 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      if (_buscaRealizada || isEdit)
+                      if (_loadingDados)
+                        const SizedBox(height: 110, child: Center(child: CircularProgressIndicator(color: corTema)))
+                      else if (_buscaRealizada || isEdit)
                         SizedBox(
-                          height: 110,
+                          height: 300, 
                           child: _resultadosBusca.isEmpty 
-                              ? const Center(child: Text('Nenhum item encontrado na pesquisa.', style: TextStyle(fontSize: 12, color: Colors.grey)))
-                              : ListView(
-                                  scrollDirection: Axis.horizontal,
-                                  children: _resultadosBusca.map((item) {
-                                    final int id = item['id'] ?? item['ID'];
-                                    final bool sel = (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds.contains(id) : _produtosComboSelecionadosIds.contains(id);
-                                    final String labelExtra = (_categoria == 'Açai' || _categoria == 'Cremes') ? '+R\$ ${item['price']}' : (item['category'] ?? item['Category'] ?? '');
-                                    
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8.0),
-                                      child: _buildCardSelecao(id, item['name'] ?? item['Name'] ?? '', labelExtra, item['image_url'] ?? '', sel, () {
-                                        setState(() { 
-                                          if (_categoria == 'Açai' || _categoria == 'Cremes') {
-                                            sel ? _adicionaisSelecionadosIds.remove(id) : _adicionaisSelecionadosIds.add(id); 
-                                          } else {
-                                            sel ? _produtosComboSelecionadosIds.remove(id) : _produtosComboSelecionadosIds.add(id); 
-                                          }
-                                        });
-                                      }),
-                                    );
-                                  }).toList(),
+                              ? const Center(child: Text('Nenhum item encontrado na pesquisa.', style: TextStyle(fontSize: 14, color: Colors.grey)))
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[200]!),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: ListView.separated(
+                                    padding: const EdgeInsets.all(12),
+                                    itemCount: _resultadosBusca.length,
+                                    separatorBuilder: (context, index) => const Divider(height: 16),
+                                    itemBuilder: (context, index) {
+                                      final item = _resultadosBusca[index];
+                                      final int id = item['id'] ?? item['ID'];
+                                      final bool sel = (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds.contains(id) : _produtosComboSelecionadosIds.contains(id);
+                                      final String adNome = item['name'] ?? item['Name'] ?? '';
+                                      final double adPreco = double.tryParse((item['price'] ?? item['Price'] ?? 0).toString()) ?? 0.0;
+                                      final String imgUrl = item['image_url'] ?? item['ImageURL'] ?? '';
+                                      final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
+
+                                      String textoPreco = (_categoria == 'Açai' || _categoria == 'Cremes') 
+                                          ? '+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}'
+                                          : (item['category'] ?? item['Category'] ?? '');
+
+                                      return InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            if (_categoria == 'Açai' || _categoria == 'Cremes') {
+                                              sel ? _adicionaisSelecionadosIds.remove(id) : _adicionaisSelecionadosIds.add(id);
+                                            } else {
+                                              sel ? _produtosComboSelecionadosIds.remove(id) : _produtosComboSelecionadosIds.add(id);
+                                            }
+                                          });
+                                        },
+                                        child: Row(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: SizedBox(
+                                                width: 50, height: 50,
+                                                child: f.isEmpty || f.first == 'null'
+                                                    ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
+                                                    : (f.first.startsWith('data:image') 
+                                                        ? Image.memory(base64Decode(f.first.split(',')[1]), fit: BoxFit.cover)
+                                                        : Image.network(f.first, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: Colors.grey[400])))
+                                              )
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                                  const SizedBox(height: 4),
+                                                  Text(textoPreco, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+                                                ],
+                                              ),
+                                            ),
+                                            Container(
+                                              width: 24, height: 24,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: sel ? corTema : Colors.grey[400]!, width: 2),
+                                                color: sel ? corTema : Colors.transparent,
+                                              ),
+                                              child: sel ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
+                                            )
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                         )
                       else
@@ -408,7 +526,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                     const SizedBox(height: 8),
                     const Text('Fotos do Produto', style: TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    _loadingFotoEdicao
+                    _loadingDados
                         ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: corTema))))
                         : Wrap(
                             spacing: 8, runSpacing: 8,
@@ -433,10 +551,12 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                   ],
                                 );
                               }),
-                              InkWell(
-                                onTap: _escolherFoto,
-                                child: Container(width: 85, height: 85, decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: corTema.withOpacity(0.3))), child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo, color: corTema, size: 24), SizedBox(height: 4), Text('Adicionar', style: TextStyle(color: corTema, fontSize: 10, fontWeight: FontWeight.bold))])),
-                              ),
+                              _isUploadingImage
+                                  ? Container(width: 85, height: 85, decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: corTema.withOpacity(0.3))), child: const Center(child: CircularProgressIndicator(color: corTema, strokeWidth: 2)))
+                                  : InkWell(
+                                      onTap: _escolherFoto,
+                                      child: Container(width: 85, height: 85, decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: corTema.withOpacity(0.3))), child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo, color: corTema, size: 24), SizedBox(height: 4), Text('Adicionar', style: TextStyle(color: corTema, fontSize: 10, fontWeight: FontWeight.bold))])),
+                                    ),
                             ],
                           ),
                     const SizedBox(height: 24),
