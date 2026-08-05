@@ -7,6 +7,8 @@ import 'package:acaiteria_front/core/constants/api_constants.dart';
 import 'package:acaiteria_front/features/auth/services/catalogo_service.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
 import 'package:acaiteria_front/features/auth/services/imgbb_service.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class FormCatalogoPage extends StatefulWidget {
   final Map<String, dynamic>? catalogoParaEditar;
@@ -43,6 +45,19 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
   final Map<int, TextEditingController> _estoqueControllers = {};
   final Map<int, TextEditingController> _obsControllers = {};
 
+  final FlutterTts _flutterTts = FlutterTts();
+  final GlobalKey _keyCampos = GlobalKey();
+  final GlobalKey _keyCores = GlobalKey();
+  final GlobalKey _keyProdutos = GlobalKey();
+  final GlobalKey _keySalvar = GlobalKey();
+
+  final List<String> _textosMascote = [
+    "Aqui você define o nome do seu catálogo e a frase de chamariz para os seus clientes.",
+    "Nesta parte, você personaliza as cores para ficarem com a cara da sua marca e escolhe uma foto de capa bem chamativa!",
+    "Pesquise e adicione os produtos que você quer mostrar neste catálogo. Você pode até definir preços e estoques diferentes do padrão da loja!",
+    "Quando tudo estiver do seu jeito, é só clicar em Salvar para colocar o catálogo no ar!"
+  ];
+
   final List<String> _opcoesCorTema = [
     '#4A0E4E', '#800080', '#E1306C', '#FF0000', '#FF8C00', '#25D366', '#000000', '#1E90FF', 
   ];
@@ -54,6 +69,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
   @override
   void initState() {
     super.initState();
+    _flutterTts.setLanguage("pt-BR");
     if (widget.catalogoParaEditar != null) {
       final cat = widget.catalogoParaEditar!;
       _tituloController.text = cat['titulo'] ?? '';
@@ -69,6 +85,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
 
   @override
   void dispose() {
+    _flutterTts.stop();
     _tituloController.dispose();
     _descricaoController.dispose();
     _pesquisaController.dispose();
@@ -263,6 +280,182 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     }
   }
 
+  void _playAudioForStep(int? index) async {
+    await _flutterTts.stop();
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (index != null && index >= 0 && index < _textosMascote.length) {
+      await _flutterTts.speak(_textosMascote[index]);
+    }
+  }
+
+  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast, Color corTema) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: corTema, width: 3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: corTema),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    _flutterTts.stop();
+                    ShowCaseWidget.of(context).dismiss();
+                  },
+                  icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: corTema,
+                    foregroundColor: _hexToColor(_corLetras),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: () {
+                    _flutterTts.stop();
+                    if (isLast) {
+                      ShowCaseWidget.of(context).dismiss();
+                    } else {
+                      ShowCaseWidget.of(context).next();
+                    }
+                  },
+                  icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: corTema, width: 3),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      width: 100, height: 100, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        child: Text(
+                          "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
+                          "Aqui é onde a criatividade rola solta. Você pode personalizar as cores, a capa e escolher a dedo os produtos deste catálogo.\n\n"
+                          "Quer fazer um Tour Guiado rápido?",
+                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: corTema,
+                          foregroundColor: _hexToColor(_corLetras),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          ShowCaseWidget.of(showcaseContext).startShowCase([
+                            _keyCampos,
+                            _keyCores,
+                            _keyProdutos,
+                            _keySalvar,
+                          ]);
+                        },
+                        icon: const Icon(Icons.slideshow, size: 24),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: corTema,
+                          side: BorderSide(color: corTema, width: 2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildColorPicker(String title, String currentValue, List<String> options, Function(String) onSelect) {
     final corTemaDinamica = _hexToColor(_corTema);
     return Column(
@@ -308,363 +501,440 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     final corTemaDinamica = _hexToColor(_corTema);
     final corLetrasDinamica = _hexToColor(_corLetras);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      appBar: AppBar(
-        backgroundColor: corTemaDinamica,
-        foregroundColor: corLetrasDinamica,
-        title: Text(isEdit ? 'Editar Catálogo' : 'Novo Catálogo', style: const TextStyle(fontWeight: FontWeight.w900)),
-        elevation: 0,
-      ),
-      body: _isLoadingEdit 
-        ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
-        : Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 900),
-          padding: const EdgeInsets.all(16.0),
-          child: Card(
+    return ShowCaseWidget(
+      onStart: (index, key) => _playAudioForStep(index),
+      onComplete: (index, key) => _flutterTts.stop(),
+      onFinish: () => _flutterTts.stop(),
+      builder: (showcaseContext) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F6F8),
+          appBar: AppBar(
+            backgroundColor: corTemaDinamica,
+            foregroundColor: corLetrasDinamica,
+            title: Text(isEdit ? 'Editar Catálogo' : 'Novo Catálogo', style: const TextStyle(fontWeight: FontWeight.w900)),
             elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: corTemaDinamica.withOpacity(0.2)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    Text(
-                      isEdit ? 'Atualizar Dados do Catálogo' : 'Criar Novo Catálogo',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: corTemaDinamica, letterSpacing: -0.5),
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _tituloController,
-                      decoration: InputDecoration(
-                        labelText: 'Título do Catálogo (Nome da Loja)',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _descricaoController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Descrição / Slogan',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F9FA),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildColorPicker('Escolha a Cor do Tema', _corTema, _opcoesCorTema, (hex) => setState(() => _corTema = hex)),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24.0),
-                            child: Divider(),
-                          ),
-                          _buildColorPicker('Escolha a Cor das Letras (Botões e Títulos)', _corLetras, _opcoesCorLetras, (hex) => setState(() => _corLetras = hex)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text('Foto de Capa do Catálogo (Banner)', style: TextStyle(color: corTemaDinamica, fontSize: 14, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.end,
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 300),
-                          child: Container(
-                            height: 140,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
+          ),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: _isLoadingEdit 
+                  ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 120),
+                      child: Center(
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 900),
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: corTemaDinamica.withOpacity(0.2)),
                             ),
-                            child: _isUploadingCapa 
-                                ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
-                                : _fotoCapa.isEmpty
-                                    ? const Center(child: Icon(Icons.wallpaper, color: Colors.grey, size: 40))
-                                    : ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: _fotoCapa.startsWith('data:image')
-                                            ? Image.memory(base64Decode(_fotoCapa.split(',')[1]), fit: BoxFit.cover)
-                                            : Image.network(_fotoCapa, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image)),
-                                      ),
-                          ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFF1F3F5),
-                                foregroundColor: corTemaDinamica,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  side: BorderSide(color: corTemaDinamica.withOpacity(0.3)),
-                                ),
-                              ),
-                              onPressed: _isUploadingCapa ? null : _escolherFotoCapa, 
-                              icon: _isUploadingCapa 
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Icon(Icons.add_a_photo, size: 18),
-                              label: Text(
-                                _isUploadingCapa ? 'Enviando...' : (_fotoCapa.isEmpty ? 'Escolher Capa' : 'Alterar Capa'), 
-                                style: const TextStyle(fontWeight: FontWeight.bold)
-                              ),
-                            ),
-                            if (_fotoCapa.isNotEmpty && !_isUploadingCapa) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => setState(() => _fotoCapa = ''),
-                                tooltip: 'Remover Capa',
-                              ),
-                            ]
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    Text('Localizar e Adicionar Produto', style: TextStyle(color: corTemaDinamica, fontSize: 18, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 16),
-                    
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: corTemaDinamica.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: corTemaDinamica.withOpacity(0.2)),
-                      ),
-                      child: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.end,
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          SizedBox(
-                            width: 250,
-                            child: TextFormField(
-                              controller: _pesquisaController,
-                              decoration: InputDecoration(
-                                labelText: 'Cód. ou Descrição',
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
-                                suffixIcon: _isSearching 
-                                  ? const Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2))
-                                  : IconButton(
-                                      icon: const Icon(Icons.search, color: Colors.red),
-                                      onPressed: () => _pesquisarProdutosNoBanco(_pesquisaController.text),
-                                    ),
-                              ),
-                              onFieldSubmitted: (v) => _pesquisarProdutosNoBanco(v),
-                            ),
-                          ),
-                          
-                          SizedBox(
-                            width: 320,
-                            child: DropdownButtonFormField<int>(
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                labelText: 'Produto',
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
-                              ),
-                              hint: const Text('Selecione...'),
-                              value: _produtoSelecionadoId,
-                              items: _resultadosPesquisa.map((p) {
-                                final int id = int.tryParse((p['id'] ?? p['ID'] ?? 0).toString()) ?? 0;
-                                final String nome = p['name'] ?? p['Name'] ?? 'Sem Nome';
-                                return DropdownMenuItem<int>(
-                                  value: id,
-                                  child: Text(nome, overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() => _produtoSelecionadoId = val);
-                              },
-                            ),
-                          ),
-
-                          SizedBox(
-                            height: 56, 
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD32F2F),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                              ),
-                              icon: const Icon(Icons.add_circle_outline),
-                              label: const Text('Adicionar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              onPressed: _produtoSelecionadoId == null ? null : () {
-                                final produto = _resultadosPesquisa.firstWhere(
-                                  (p) => int.tryParse((p['id'] ?? p['ID']).toString()) == _produtoSelecionadoId
-                                );
-                                _adicionarProdutoAoCatalogo(produto);
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 32),
-                    
-                    _produtosSelecionados.isEmpty
-                        ? const Center(child: Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Text('Nenhum produto adicionado. Use a barra de pesquisa acima.', style: TextStyle(color: Colors.grey)),
-                          ))
-                        : ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _produtosSelecionados.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 16),
-                            itemBuilder: (context, index) {
-                              final p = _produtosSelecionados[index];
-                              final int id = p['id'] ?? 0;
-                              final String nome = p['name'] ?? 'Sem nome';
-                              final String urlCompleta = p['image_url'] ?? '';
-                              final List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
-
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: corTemaDinamica, width: 1.5),
-                                  boxShadow: [BoxShadow(color: corTemaDinamica.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
-                                ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Form(
+                                key: _formKey,
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      leading: Container(
-                                        width: 50,
-                                        height: 50,
-                                        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: fotos.isEmpty || fotos.first == 'null'
-                                              ? const Icon(Icons.fastfood, color: Colors.grey)
-                                              : fotos.first.startsWith('data:image')
-                                                  ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)
-                                                  : Image.network(fotos.first, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
-                                        ),
-                                      ),
-                                      title: Text(nome, style: TextStyle(fontWeight: FontWeight.bold, color: corTemaDinamica)),
-                                      subtitle: Text('Preço Base: R\$ ${p['price']} | Estoque: ${p['estoque']}', style: const TextStyle(fontSize: 12)),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                        onPressed: () => _removerProdutoDoCatalogo(id),
-                                      ),
+                                    Text(
+                                      isEdit ? 'Atualizar Dados do Catálogo' : 'Criar Novo Catálogo',
+                                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: corTemaDinamica, letterSpacing: -0.5),
                                     ),
-                                    const Divider(height: 1),
-                                    Padding(
-                                      padding: const EdgeInsets.all(16.0),
+                                    const SizedBox(height: 32),
+                                    Showcase.withWidget(
+                                      key: _keyCampos,
+                                      container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false, corTemaDinamica),
                                       child: Column(
                                         children: [
-                                          Wrap(
-                                            spacing: 16,
-                                            runSpacing: 16,
-                                            children: [
-                                              SizedBox(
-                                                width: 150,
-                                                child: TextFormField(
-                                                  controller: _precoControllers[id],
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Preço Personalizado',
-                                                    isDense: true,
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                width: 150,
-                                                child: TextFormField(
-                                                  controller: _estoqueControllers[id],
-                                                  keyboardType: TextInputType.number,
-                                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Qtd. neste catálogo',
-                                                    isDense: true,
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 16),
                                           TextFormField(
-                                            controller: _obsControllers[id],
+                                            controller: _tituloController,
                                             decoration: InputDecoration(
-                                              labelText: 'Observação (Ex: Apenas Delivery, Promoção)',
-                                              isDense: true,
+                                              labelText: 'Título do Catálogo (Nome da Loja)',
                                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                                          ),
+                                          const SizedBox(height: 24),
+                                          TextFormField(
+                                            controller: _descricaoController,
+                                            maxLines: 2,
+                                            decoration: InputDecoration(
+                                              labelText: 'Descrição / Slogan',
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    )
+                                    ),
+                                    const SizedBox(height: 32),
+                                    Showcase.withWidget(
+                                      key: _keyCores,
+                                      container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false, corTemaDinamica),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(24),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8F9FA),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.grey[200]!),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                _buildColorPicker('Escolha a Cor do Tema', _corTema, _opcoesCorTema, (hex) => setState(() => _corTema = hex)),
+                                                const Padding(
+                                                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                                                  child: Divider(),
+                                                ),
+                                                _buildColorPicker('Escolha a Cor das Letras (Botões e Títulos)', _corLetras, _opcoesCorLetras, (hex) => setState(() => _corLetras = hex)),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 32),
+                                          Text('Foto de Capa do Catálogo (Banner)', style: TextStyle(color: corTemaDinamica, fontSize: 14, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 12),
+                                          Wrap(
+                                            crossAxisAlignment: WrapCrossAlignment.end,
+                                            spacing: 16,
+                                            runSpacing: 16,
+                                            children: [
+                                              ConstrainedBox(
+                                                constraints: const BoxConstraints(maxWidth: 300),
+                                                child: Container(
+                                                  height: 140,
+                                                  width: double.infinity,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[200],
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: Colors.grey[300]!),
+                                                  ),
+                                                  child: _isUploadingCapa 
+                                                      ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
+                                                      : _fotoCapa.isEmpty
+                                                          ? const Center(child: Icon(Icons.wallpaper, color: Colors.grey, size: 40))
+                                                          : ClipRRect(
+                                                              borderRadius: BorderRadius.circular(8),
+                                                              child: _fotoCapa.startsWith('data:image')
+                                                                  ? Image.memory(base64Decode(_fotoCapa.split(',')[1]), fit: BoxFit.cover)
+                                                                  : Image.network(_fotoCapa, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image)),
+                                                            ),
+                                                ),
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  ElevatedButton.icon(
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFFF1F3F5),
+                                                      foregroundColor: corTemaDinamica,
+                                                      elevation: 0,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        side: BorderSide(color: corTemaDinamica.withOpacity(0.3)),
+                                                      ),
+                                                    ),
+                                                    onPressed: _isUploadingCapa ? null : _escolherFotoCapa, 
+                                                    icon: _isUploadingCapa 
+                                                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                                        : const Icon(Icons.add_a_photo, size: 18),
+                                                    label: Text(
+                                                      _isUploadingCapa ? 'Enviando...' : (_fotoCapa.isEmpty ? 'Escolher Capa' : 'Alterar Capa'), 
+                                                      style: const TextStyle(fontWeight: FontWeight.bold)
+                                                    ),
+                                                  ),
+                                                  if (_fotoCapa.isNotEmpty && !_isUploadingCapa) ...[
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                                      onPressed: () => setState(() => _fotoCapa = ''),
+                                                      tooltip: 'Remover Capa',
+                                                    ),
+                                                  ]
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 40),
+                                    const Divider(),
+                                    const SizedBox(height: 16),
+                                    Showcase.withWidget(
+                                      key: _keyProdutos,
+                                      container: _buildTooltipMascote(showcaseContext, _textosMascote[2], false, corTemaDinamica),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Localizar e Adicionar Produto', style: TextStyle(color: corTemaDinamica, fontSize: 18, fontWeight: FontWeight.w900)),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: corTemaDinamica.withOpacity(0.05),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: corTemaDinamica.withOpacity(0.2)),
+                                            ),
+                                            child: Wrap(
+                                              crossAxisAlignment: WrapCrossAlignment.end,
+                                              spacing: 16,
+                                              runSpacing: 16,
+                                              children: [
+                                                SizedBox(
+                                                  width: 250,
+                                                  child: TextFormField(
+                                                    controller: _pesquisaController,
+                                                    decoration: InputDecoration(
+                                                      labelText: 'Cód. ou Descrição',
+                                                      filled: true,
+                                                      fillColor: Colors.white,
+                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
+                                                      suffixIcon: _isSearching 
+                                                        ? const Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2))
+                                                        : IconButton(
+                                                            icon: const Icon(Icons.search, color: Colors.red),
+                                                            onPressed: () => _pesquisarProdutosNoBanco(_pesquisaController.text),
+                                                          ),
+                                                    ),
+                                                    onFieldSubmitted: (v) => _pesquisarProdutosNoBanco(v),
+                                                  ),
+                                                ),
+                                                
+                                                SizedBox(
+                                                  width: 320,
+                                                  child: DropdownButtonFormField<int>(
+                                                    isExpanded: true,
+                                                    decoration: InputDecoration(
+                                                      labelText: 'Produto',
+                                                      filled: true,
+                                                      fillColor: Colors.white,
+                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
+                                                    ),
+                                                    hint: const Text('Selecione...'),
+                                                    value: _produtoSelecionadoId,
+                                                    items: _resultadosPesquisa.map((p) {
+                                                      final int id = int.tryParse((p['id'] ?? p['ID'] ?? 0).toString()) ?? 0;
+                                                      final String nome = p['name'] ?? p['Name'] ?? 'Sem Nome';
+                                                      return DropdownMenuItem<int>(
+                                                        value: id,
+                                                        child: Text(nome, overflow: TextOverflow.ellipsis),
+                                                      );
+                                                    }).toList(),
+                                                    onChanged: (val) {
+                                                      setState(() => _produtoSelecionadoId = val);
+                                                    },
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 56, 
+                                                  child: ElevatedButton.icon(
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFFD32F2F),
+                                                      foregroundColor: Colors.white,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                                                    ),
+                                                    icon: const Icon(Icons.add_circle_outline),
+                                                    label: const Text('Adicionar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                    onPressed: _produtoSelecionadoId == null ? null : () {
+                                                      final produto = _resultadosPesquisa.firstWhere(
+                                                        (p) => int.tryParse((p['id'] ?? p['ID']).toString()) == _produtoSelecionadoId
+                                                      );
+                                                      _adicionarProdutoAoCatalogo(produto);
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 32),
+                                          _produtosSelecionados.isEmpty
+                                              ? const Center(child: Padding(
+                                                  padding: EdgeInsets.all(32.0),
+                                                  child: Text('Nenhum produto adicionado. Use a barra de pesquisa acima.', style: TextStyle(color: Colors.grey)),
+                                                ))
+                                              : ListView.separated(
+                                                  shrinkWrap: true,
+                                                  physics: const NeverScrollableScrollPhysics(),
+                                                  itemCount: _produtosSelecionados.length,
+                                                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                                                  itemBuilder: (context, index) {
+                                                    final p = _produtosSelecionados[index];
+                                                    final int id = p['id'] ?? 0;
+                                                    final String nome = p['name'] ?? 'Sem nome';
+                                                    final String urlCompleta = p['image_url'] ?? '';
+                                                    final List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
+
+                                                    return Container(
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        borderRadius: BorderRadius.circular(12),
+                                                        border: Border.all(color: corTemaDinamica, width: 1.5),
+                                                        boxShadow: [BoxShadow(color: corTemaDinamica.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
+                                                      ),
+                                                      child: Column(
+                                                        children: [
+                                                          ListTile(
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                            leading: Container(
+                                                              width: 50,
+                                                              height: 50,
+                                                              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                                                              child: ClipRRect(
+                                                                borderRadius: BorderRadius.circular(8),
+                                                                child: fotos.isEmpty || fotos.first == 'null'
+                                                                    ? const Icon(Icons.fastfood, color: Colors.grey)
+                                                                    : fotos.first.startsWith('data:image')
+                                                                        ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)
+                                                                        : Image.network(fotos.first, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
+                                                              ),
+                                                            ),
+                                                            title: Text(nome, style: TextStyle(fontWeight: FontWeight.bold, color: corTemaDinamica)),
+                                                            subtitle: Text('Preço Base: R\$ ${p['price']} | Estoque: ${p['estoque']}', style: const TextStyle(fontSize: 12)),
+                                                            trailing: IconButton(
+                                                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                                              onPressed: () => _removerProdutoDoCatalogo(id),
+                                                            ),
+                                                          ),
+                                                          const Divider(height: 1),
+                                                          Padding(
+                                                            padding: const EdgeInsets.all(16.0),
+                                                            child: Column(
+                                                              children: [
+                                                                Wrap(
+                                                                  spacing: 16,
+                                                                  runSpacing: 16,
+                                                                  children: [
+                                                                    SizedBox(
+                                                                      width: 150,
+                                                                      child: TextFormField(
+                                                                        controller: _precoControllers[id],
+                                                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                                        decoration: InputDecoration(
+                                                                          labelText: 'Preço Personalizado',
+                                                                          isDense: true,
+                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    SizedBox(
+                                                                      width: 150,
+                                                                      child: TextFormField(
+                                                                        controller: _estoqueControllers[id],
+                                                                        keyboardType: TextInputType.number,
+                                                                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                                        decoration: InputDecoration(
+                                                                          labelText: 'Qtd. neste catálogo',
+                                                                          isDense: true,
+                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                const SizedBox(height: 16),
+                                                                TextFormField(
+                                                                  controller: _obsControllers[id],
+                                                                  decoration: InputDecoration(
+                                                                    labelText: 'Observação (Ex: Apenas Delivery, Promoção)',
+                                                                    isDense: true,
+                                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          )
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 40),
+                                    Showcase.withWidget(
+                                      key: _keySalvar,
+                                      container: _buildTooltipMascote(showcaseContext, _textosMascote[3], true, corTemaDinamica),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        height: 56,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: corTemaDinamica,
+                                            foregroundColor: corLetrasDinamica,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: _isSaving ? null : _salvar,
+                                          child: _isSaving 
+                                            ? CircularProgressIndicator(color: corLetrasDinamica)
+                                            : Text(
+                                                isEdit ? 'SALVAR ALTERAÇÕES' : 'CRIAR CATÁLOGO', 
+                                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)
+                                              ),
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              );
-                            },
-                          ),
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: corTemaDinamica,
-                          foregroundColor: corLetrasDinamica,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: _isSaving ? null : _salvar,
-                        child: _isSaving 
-                          ? CircularProgressIndicator(color: corLetrasDinamica)
-                          : Text(
-                              isEdit ? 'SALVAR ALTERAÇÕES' : 'CRIAR CATÁLOGO', 
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)
+                              ),
                             ),
+                          ),
+                        ),
                       ),
                     ),
-                  ],
+              ),
+              Positioned(
+                bottom: 24,
+                right: 24,
+                child: GestureDetector(
+                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTemaDinamica),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: corTemaDinamica.withOpacity(0.3),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 5),
+                        )
+                      ]
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: Image.asset(
+                        'assets/images/mascote_acenando.gif',
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 70, height: 70,
+                          decoration: BoxDecoration(color: corTemaDinamica, shape: BoxShape.circle),
+                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 }

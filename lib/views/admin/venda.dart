@@ -7,6 +7,8 @@ import 'package:acaiteria_front/features/auth/services/vendas_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class VendaPage extends StatefulWidget {
   const VendaPage({super.key});
@@ -31,10 +33,25 @@ class _VendaPageState extends State<VendaPage> {
 
   static const Color corTema = Color(0xFF4A0E4E);
 
+  // Variáveis do Tour Guiado
+  final FlutterTts _flutterTts = FlutterTts();
+  final GlobalKey _keyBusca = GlobalKey();
+  final GlobalKey _keyCarrinho = GlobalKey();
+  final GlobalKey _keyAcoes = GlobalKey();
+  final GlobalKey _keyFinalizar = GlobalKey();
+
+  final List<String> _textosMascote = [
+    "Bem-vindo ao Caixa! Na barra superior, digite o nome ou código do produto e aperte Enter. Escolha a quantidade e depois clique em Lançar.",
+    "Aqui no centro ficam os itens do pedido. Você pode alterar as quantidades ou excluir algo que tenha lançado errado.",
+    "No menu lateral, coloque o nome e telefone do cliente para enviar o comprovante via WhatsApp! Você também pode aplicar descontos, cancelar itens, cancelar a venda inteira ou lançar um Valor Avulso para vendas rápidas.",
+    "Tudo certo? Confira o total e clique em Finalizar Venda para escolher a forma de pagamento e fechar o pedido!"
+  ];
+
   @override
   void initState() {
     super.initState();
     _focoCodigo.requestFocus();
+    _flutterTts.setLanguage("pt-BR");
   }
 
   @override
@@ -44,7 +61,193 @@ class _VendaPageState extends State<VendaPage> {
     _nomeClienteController.dispose();
     _telefoneClienteController.dispose();
     _focoCodigo.dispose();
+    _flutterTts.stop();
     super.dispose();
+  }
+
+  void _playAudioForStep(int? index) async {
+    await _flutterTts.stop();
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (index != null && index >= 0 && index < _textosMascote.length) {
+      await _flutterTts.speak(_textosMascote[index]);
+    }
+  }
+
+  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: corTema, width: 3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    _flutterTts.stop();
+                    ShowCaseWidget.of(context).dismiss();
+                    _focoCodigo.requestFocus();
+                  },
+                  icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: corTema,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: () {
+                    _flutterTts.stop();
+                    if (isLast) {
+                      ShowCaseWidget.of(context).dismiss();
+                      _focoCodigo.requestFocus();
+                    } else {
+                      ShowCaseWidget.of(context).next();
+                    }
+                  },
+                  icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: corTema, width: 3),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      width: 100, height: 100, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        child: Text(
+                          "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
+                          "Neste Frente de Caixa (PDV) você pode:\n"
+                          "• Buscar produtos e lançar no pedido\n"
+                          "• Fazer Lançamento Avulso para vendas rápidas\n"
+                          "• Inserir o WhatsApp do cliente para enviar o cupom\n"
+                          "• Aplicar descontos ou cancelar itens/vendas\n\n"
+                          "Quer fazer um Tour Guiado rápido para aprender tudo na prática?",
+                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: corTema,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          ShowCaseWidget.of(showcaseContext).startShowCase([
+                            _keyBusca,
+                            _keyCarrinho,
+                            _keyAcoes,
+                            _keyFinalizar,
+                          ]);
+                        },
+                        icon: const Icon(Icons.slideshow, size: 24),
+                        label: const Text('Iniciar Treinamento', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: corTema,
+                          side: const BorderSide(color: corTema, width: 2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _focoCodigo.requestFocus();
+                        },
+                        child: const Text('Apenas Ler (Sair)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _abrirModalVendaAvulsa() {
@@ -418,6 +621,7 @@ class _VendaPageState extends State<VendaPage> {
       _codigoInputController.clear();
       _quantidadeController.text = '1.000';
     });
+    _focoCodigo.requestFocus();
   }
 
   Future<void> _gerarCupomBalcaoPdf(String idVenda, String cliente, String telefone, String formaPgto) async {
@@ -560,6 +764,7 @@ class _VendaPageState extends State<VendaPage> {
             onPressed: () {
               setState(() => _descontoVenda = double.tryParse(ctrl.text) ?? 0.0);
               Navigator.pop(context);
+              _focoCodigo.requestFocus();
             },
             child: const Text('Aplicar', style: TextStyle(color: Colors.white)),
           )
@@ -703,7 +908,13 @@ class _VendaPageState extends State<VendaPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
+                TextButton(
+                  onPressed: () { 
+                    Navigator.pop(context); 
+                    _focoCodigo.requestFocus(); 
+                  }, 
+                  child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
+                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
                   onPressed: () async {
@@ -756,209 +967,275 @@ class _VendaPageState extends State<VendaPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          Container(
-            color: corTema,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('AÇAITERIA SHALOM - PDV PROFISSIONAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                Row(
-                  children: [
-                    Icon(Icons.circle, color: Colors.greenAccent, size: 12),
-                    SizedBox(width: 8),
-                    Text('SISTEMA ONLINE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ],
-                )
-              ],
-            ),
-          ),
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 300,
-                  color: const Color(0xFFF8F9FA),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 120, height: 120,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: corTema, width: 2),
-                          image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _nomeClienteController,
-                        decoration: const InputDecoration(labelText: 'Nome do Cliente', prefixIcon: Icon(Icons.person, color: corTema)),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _telefoneClienteController,
-                        decoration: const InputDecoration(labelText: 'Telefone/WhatsApp', prefixIcon: Icon(Icons.phone, color: corTema)),
-                      ),
-                      const Spacer(),
-                      _itemMenu('LANÇAR VALOR AVULSO', _abrirModalVendaAvulsa, const Color(0xFFE8F5E9)),
-                      _itemMenu('DESCONTO (R\$)', _abrirDialogDesconto, Colors.orange[50]),
-                      _itemMenu('CANCELAR ITEM', () { if (_carrinho.isNotEmpty) setState(() => _carrinho.removeLast()); }, Colors.red[50]),
-                      _itemMenu('CANCELAR VENDA', () { setState(() { _carrinho.clear(); _produtoUltimoLancado = null; _descontoVenda = 0; }); }, Colors.red[100]),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(25),
-                    child: Column(
+    return ShowCaseWidget(
+      onStart: (index, key) => _playAudioForStep(index),
+      onComplete: (index, key) => _flutterTts.stop(),
+      onFinish: () {
+        _flutterTts.stop();
+        _focoCodigo.requestFocus();
+      },
+      builder: (showcaseContext) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  Container(
+                    color: corTema,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Text('AÇAITERIA SHALOM - PDV PROFISSIONAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
                         Row(
                           children: [
-                            Expanded(
-                              flex: 4,
-                              child: TextField(
-                                controller: _codigoInputController,
-                                focusNode: _focoCodigo,
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                                decoration: const InputDecoration(
-                                  labelText: 'CÓDIGO OU NOME DO PRODUTO (BASE)',
-                                  labelStyle: TextStyle(fontSize: 14),
-                                  border: OutlineInputBorder(),
-                                  filled: true, fillColor: Color(0xFFF1F3F4),
-                                ),
-                                onSubmitted: (_) => _tentarLancarProduto(),
-                              ),
-                            ),
-                            const SizedBox(width: 15),
-                            Expanded(
-                              flex: 1,
-                              child: TextField(
-                                controller: _quantidadeController,
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                                decoration: const InputDecoration(labelText: 'PESO (KG)', border: OutlineInputBorder()),
-                                onSubmitted: (_) => _tentarLancarProduto(),
-                              ),
-                            ),
-                            const SizedBox(width: 15),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: corTema,
-                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                              ),
-                              onPressed: _tentarLancarProduto,
-                              child: const Text('LANÇAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                            )
+                            Icon(Icons.circle, color: Colors.greenAccent, size: 12),
+                            SizedBox(width: 8),
+                            Text('SISTEMA ONLINE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
-                        ),
-                        const SizedBox(height: 25),
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[200]!),
-                              color: const Color(0xFFFCFCFC),
-                            ),
-                            child: _carrinho.isEmpty
-                              ? Center(child: Text('CAIXA AGUARDANDO LANÇAMENTO...', style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold, letterSpacing: 2)))
-                              : ListView.builder(
-                                  itemCount: _carrinho.length,
-                                  itemBuilder: (context, idx) {
-                                    final item = _carrinho[idx];
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                                      decoration: BoxDecoration(
-                                        color: idx % 2 == 0 ? Colors.white : const Color(0xFFF9F9F9),
-                                        border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, color: corTema)),
-                                          const SizedBox(width: 20),
-                                          Expanded(child: Text(item['nome'].toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                                                onPressed: () {
-                                                  if (item['quantidade'] > 1) {
-                                                    _addAoCarrinhoBotoes(item, item['quantidade'] - 1);
-                                                  } else {
-                                                    setState(() => _carrinho.removeAt(idx));
-                                                  }
-                                                },
-                                              ),
-                                              Text('${item['quantidade'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                              IconButton(
-                                                icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-                                                onPressed: () => _addAoCarrinhoBotoes(item, item['quantidade'] + 1),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(width: 30),
-                                          Text('R\$ ${(item['preco'] * item['quantidade']).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
-                                          const SizedBox(width: 10),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_forever, color: Colors.red, size: 20),
-                                            onPressed: () => setState(() => _carrinho.removeAt(idx)),
-                                          )
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(12)),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Subtotal: R\$ ${_subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
-                                  Text('Desconto: R\$ ${_descontoVenda.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.red)),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Text('TOTAL: ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
-                                  Text('R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w900, color: corTema)),
-                                ],
-                              ),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFD700),
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                                ),
-                                onPressed: _finalizarVenda,
-                                icon: const Icon(Icons.check_circle, color: Colors.black, size: 30),
-                                label: const Text('FINALIZAR VENDA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
-                              )
-                            ],
-                          ),
                         )
                       ],
                     ),
                   ),
-                )
-              ],
-            ),
-          )
-        ],
-      ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 300,
+                          color: const Color(0xFFF8F9FA),
+                          padding: const EdgeInsets.all(16),
+                          child: Showcase.withWidget(
+                            key: _keyAcoes,
+                            container: _buildTooltipMascote(showcaseContext, _textosMascote[2], false),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 120, height: 120,
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: corTema, width: 2),
+                                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _nomeClienteController,
+                                  decoration: const InputDecoration(labelText: 'Nome do Cliente', prefixIcon: Icon(Icons.person, color: corTema)),
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _telefoneClienteController,
+                                  decoration: const InputDecoration(labelText: 'Telefone/WhatsApp', prefixIcon: Icon(Icons.phone, color: corTema)),
+                                ),
+                                const Spacer(),
+                                _itemMenu('LANÇAR VALOR AVULSO', _abrirModalVendaAvulsa, const Color(0xFFE8F5E9)),
+                                _itemMenu('DESCONTO (R\$)', _abrirDialogDesconto, Colors.orange[50]),
+                                _itemMenu('CANCELAR ITEM', () { if (_carrinho.isNotEmpty) setState(() => _carrinho.removeLast()); }, Colors.red[50]),
+                                _itemMenu('CANCELAR VENDA', () { setState(() { _carrinho.clear(); _produtoUltimoLancado = null; _descontoVenda = 0; }); }, Colors.red[100]),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(25),
+                            child: Column(
+                              children: [
+                                Showcase.withWidget(
+                                  key: _keyBusca,
+                                  container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 4,
+                                        child: TextField(
+                                          controller: _codigoInputController,
+                                          focusNode: _focoCodigo,
+                                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                                          decoration: const InputDecoration(
+                                            labelText: 'CÓDIGO OU NOME DO PRODUTO (BASE)',
+                                            labelStyle: TextStyle(fontSize: 14),
+                                            border: OutlineInputBorder(),
+                                            filled: true, fillColor: Color(0xFFF1F3F4),
+                                          ),
+                                          onSubmitted: (_) => _tentarLancarProduto(),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 15),
+                                      Expanded(
+                                        flex: 1,
+                                        child: TextField(
+                                          controller: _quantidadeController,
+                                          keyboardType: TextInputType.number,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                                          decoration: const InputDecoration(labelText: 'PESO (KG)', border: OutlineInputBorder()),
+                                          onSubmitted: (_) => _tentarLancarProduto(),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 15),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: corTema,
+                                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                                        ),
+                                        onPressed: _tentarLancarProduto,
+                                        child: const Text('LANÇAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 25),
+                                Expanded(
+                                  child: Showcase.withWidget(
+                                    key: _keyCarrinho,
+                                    container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey[200]!),
+                                        color: const Color(0xFFFCFCFC),
+                                      ),
+                                      child: _carrinho.isEmpty
+                                        ? Center(child: Text('CAIXA AGUARDANDO LANÇAMENTO...', style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold, letterSpacing: 2)))
+                                        : ListView.builder(
+                                            itemCount: _carrinho.length,
+                                            itemBuilder: (context, idx) {
+                                              final item = _carrinho[idx];
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                                decoration: BoxDecoration(
+                                                  color: idx % 2 == 0 ? Colors.white : const Color(0xFFF9F9F9),
+                                                  border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, color: corTema)),
+                                                    const SizedBox(width: 20),
+                                                    Expanded(child: Text(item['nome'].toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        IconButton(
+                                                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                                          onPressed: () {
+                                                            if (item['quantidade'] > 1) {
+                                                              _addAoCarrinhoBotoes(item, item['quantidade'] - 1);
+                                                            } else {
+                                                              setState(() => _carrinho.removeAt(idx));
+                                                            }
+                                                          },
+                                                        ),
+                                                        Text('${item['quantidade'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                        IconButton(
+                                                          icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+                                                          onPressed: () => _addAoCarrinhoBotoes(item, item['quantidade'] + 1),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(width: 30),
+                                                    Text('R\$ ${(item['preco'] * item['quantidade']).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
+                                                    const SizedBox(width: 10),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete_forever, color: Colors.red, size: 20),
+                                                      onPressed: () => setState(() => _carrinho.removeAt(idx)),
+                                                    )
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Showcase.withWidget(
+                                  key: _keyFinalizar,
+                                  container: _buildTooltipMascote(showcaseContext, _textosMascote[3], true),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(12)),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Subtotal: R\$ ${_subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                                            Text('Desconto: R\$ ${_descontoVenda.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.red)),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            const Text('TOTAL: ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                            Text('R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w900, color: corTema)),
+                                          ],
+                                        ),
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFFFD700),
+                                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                          ),
+                                          onPressed: _finalizarVenda,
+                                          icon: const Icon(Icons.check_circle, color: Colors.black, size: 30),
+                                          label: const Text('FINALIZAR VENDA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              ],
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  )
+                ],
+              ),
+              
+              // Botão do Mascote Flutuante
+              Positioned(
+                bottom: 120, // Subi um pouco para não ficar em cima do Finalizar Venda
+                right: 40,
+                child: GestureDetector(
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: corTema.withOpacity(0.3),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 5),
+                        )
+                      ]
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: Image.asset(
+                        'assets/images/mascote_acenando.gif',
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 70, height: 70,
+                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

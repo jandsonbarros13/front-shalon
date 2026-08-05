@@ -42,6 +42,10 @@ dependencies:
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
   geolocator: ^14.0.3
+  lottie: ^3.5.1
+  audioplayers: ^6.8.1
+  showcaseview: ^5.1.0
+  flutter_tts: ^4.0.2
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'cadastro_produto_page.dart';
 
 class ProdutosTab extends StatefulWidget {
@@ -23,10 +25,29 @@ class _ProdutosTabState extends State<ProdutosTab> {
   int _paginaAtual = 1;
   final int _itensPorPagina = 8;
 
+  final FlutterTts _flutterTts = FlutterTts();
+  final GlobalKey _keyBusca = GlobalKey();
+  final GlobalKey _keyCard = GlobalKey();
+  final GlobalKey _keyNovo = GlobalKey();
+
+  final List<String> _textosMascote = [
+    "Bem-vindo são seus Produtos! Aqui em cima, você pode pesquisar qualquer produto digitando o nome dele.",
+    "Nesta lista ficam os seus produtos. Passe o mouse sobre a foto para ver mais imagens, e use os botões embaixo para adicionar estoque, editar ou excluir.",
+    "Para adicionar um novo produto, é só clicar neste botão flutuante amarelo!"
+  ];
+
   @override
   void initState() {
     super.initState();
+    _flutterTts.setLanguage("pt-BR");
     _carregarProdutos();
+  }
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    _buscaController.dispose();
+    super.dispose();
   }
 
   Future<void> _carregarProdutos({String nome = '', bool isBusca = false}) async {
@@ -143,7 +164,186 @@ class _ProdutosTabState extends State<ProdutosTab> {
     }
   }
 
-  Widget _buildHeader(bool isMobile) {
+  void _playAudioForStep(int? index) async {
+    await _flutterTts.stop();
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (index != null && index >= 0 && index < _textosMascote.length) {
+      await _flutterTts.speak(_textosMascote[index]);
+    }
+  }
+
+  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
+    const corTema = Color(0xFF4A0E4E);
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: corTema, width: 3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    _flutterTts.stop();
+                    ShowCaseWidget.of(context).dismiss();
+                  },
+                  icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: corTema,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: () {
+                    _flutterTts.stop();
+                    if (isLast) {
+                      ShowCaseWidget.of(context).dismiss();
+                    } else {
+                      ShowCaseWidget.of(context).next();
+                    }
+                  },
+                  icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: corTema, width: 3),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      width: 100, height: 100, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        child: Text(
+                          "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
+                          "Aqui é o seu cardápio. Você pode:\n"
+                          "• Buscar e visualizar todos os produtos\n"
+                          "• Adicionar estoque rapidamente\n"
+                          "• Cadastrar, editar ou excluir itens\n\n"
+                          "Quer fazer um Tour Guiado para ver como tudo funciona?",
+                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: corTema,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          ShowCaseWidget.of(showcaseContext).startShowCase([
+                            _keyBusca,
+                            _keyCard,
+                            _keyNovo,
+                          ]);
+                        },
+                        icon: const Icon(Icons.slideshow, size: 24),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: corTema,
+                          side: BorderSide(color: corTema, width: 2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(bool isMobile, BuildContext showcaseContext) {
     final titleRow = Row(
       children: [
         Container(
@@ -175,22 +375,26 @@ class _ProdutosTabState extends State<ProdutosTab> {
       ],
     );
 
-    final searchBar = TextField(
-      controller: _buscaController,
-      maxLines: 1,
-      decoration: InputDecoration(
-        labelText: 'Buscar açaí por nome...',
-        prefixIcon: const Icon(Icons.search, color: Color(0xFF4A0E4E)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.clear),
-          onPressed: () {
-            _buscaController.clear();
-            _carregarProdutos(isBusca: true);
-          },
+    final searchBar = Showcase.withWidget(
+      key: _keyBusca,
+      container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
+      child: TextField(
+        controller: _buscaController,
+        maxLines: 1,
+        decoration: InputDecoration(
+          labelText: 'Buscar açaí por nome...',
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF4A0E4E)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () {
+              _buscaController.clear();
+              _carregarProdutos(isBusca: true);
+            },
+          ),
         ),
+        onChanged: (text) => _carregarProdutos(nome: text, isBusca: true),
       ),
-      onChanged: (text) => _carregarProdutos(nome: text, isBusca: true),
     );
 
     if (isMobile) {
@@ -278,179 +482,236 @@ class _ProdutosTabState extends State<ProdutosTab> {
     int totalPaginas = (_totalProdutos / _itensPorPagina).ceil();
     if (totalPaginas == 0) totalPaginas = 1;
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFFFD700),
-        onPressed: () async {
-          final atualizou = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CadastroProdutoPage()),
-          );
-          if (atualizou == true) {
-            _carregarProdutos(nome: _buscaController.text);
-          }
-        },
-        child: const Icon(Icons.add, color: Colors.black),
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
-        child: Column(
-          children: [
-            _buildHeader(isMobile),
-            SizedBox(height: isMobile ? 16 : 24),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF4A0E4E)))
-                  : _produtos.isEmpty
-                      ? const Center(child: Text('Nenhum açaí cadastrado no cardápio.'))
-                      : Column(
-                          children: [
-                            Expanded(
-                              child: GridView.builder(
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: colunasGrid,
-                                  crossAxisSpacing: 20,
-                                  mainAxisSpacing: 20,
-                                  childAspectRatio: proporcaoCard,
-                                ),
-                                itemCount: _produtos.length,
-                                itemBuilder: (context, index) {
-                                  final p = _produtos[index];
-                                  final String urlCompleta = (p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '').toString();
-                                  List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
-                                  final isHovered = _hoveredIndex == index;
-                                  final String categoria = (p['category'] ?? p['Category'] ?? 'Produtos').toString();
-                                  final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
-                                  final int estoqueAtual = int.tryParse((p['estoque'] ?? p['Estoque'] ?? 0).toString()) ?? 0;
+    const corTema = Color(0xFF4A0E4E);
 
-                                  return MouseRegion(
-                                    onEnter: (_) => setState(() => _hoveredIndex = index),
-                                    onExit: (_) => setState(() => _hoveredIndex = null),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      transform: isHovered && !isMobile
-                                          ? (Matrix4.identity()..translate(0, -6, 0)) 
-                                          : Matrix4.identity(),
-                                      child: Card(
-                                        elevation: isHovered && !isMobile ? 12 : 4,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                        clipBehavior: Clip.antiAlias,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Stack(
-                                                children: [
-                                                  Container(
-                                                    width: double.infinity,
-                                                    color: const Color(0xFFF5F5F5),
-                                                    child: CarrosselFotosWidget(fotos: fotos),
-                                                  ),
-                                                  Positioned(
-                                                    top: 8,
-                                                    left: 8,
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                                      decoration: BoxDecoration(
-                                                        color: _getBadgeColor(categoria),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                      child: Text(
-                                                        categoria.toUpperCase(),
-                                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Positioned(
-                                                    top: 8,
-                                                    right: 8,
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFFFD700),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                      child: Text(
-                                                        'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}',
-                                                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    p['name']?.toString() ?? '',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4A0E4E)),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    p['description']?.toString() ?? '',
-                                                    style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Row(
-                                                    children: [
-                                                      Icon(Icons.layers_outlined, size: 14, color: Colors.grey[600]),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        'Estoque: $estoqueAtual',
-                                                        style: TextStyle(color: Colors.grey[700], fontSize: 11, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Divider(height: 1, color: Colors.grey[200]),
-                                            Container(
-                                              color: Colors.grey[50],
-                                              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-                                              child: Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                                children: [
-                                                  IconButton(
-                                                    icon: const Icon(Icons.add_box_outlined, color: Colors.green, size: 20),
-                                                    tooltip: 'Adicionar Estoque',
-                                                    onPressed: () => _abrirDialogEstoque(p),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
-                                                    tooltip: 'Editar Produto',
-                                                    onPressed: () => _abrirDialogEditar(p),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                                    tooltip: 'Excluir Produto',
-                                                    onPressed: () => _confirmarExclusao(p),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
+    return ShowCaseWidget(
+      onStart: (index, key) => _playAudioForStep(index),
+      onComplete: (index, key) => _flutterTts.stop(),
+      onFinish: () => _flutterTts.stop(),
+      builder: (showcaseContext) {
+        return Scaffold(
+          floatingActionButton: Showcase.withWidget(
+            key: _keyNovo,
+            container: _buildTooltipMascote(showcaseContext, _textosMascote[2], true),
+            child: FloatingActionButton(
+              backgroundColor: const Color(0xFFFFD700),
+              onPressed: () async {
+                final atualizou = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CadastroProdutoPage()),
+                );
+                if (atualizou == true) {
+                  _carregarProdutos(nome: _buscaController.text);
+                }
+              },
+              child: const Icon(Icons.add, color: Colors.black),
+            ),
+          ),
+          body: Stack(
+            children: [
+              Padding(
+                padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
+                child: Column(
+                  children: [
+                    _buildHeader(isMobile, showcaseContext),
+                    SizedBox(height: isMobile ? 16 : 24),
+                    Expanded(
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator(color: corTema))
+                          : _produtos.isEmpty
+                              ? const Center(child: Text('Nenhum açaí cadastrado no cardápio.'))
+                              : Column(
+                                  children: [
+                                    Expanded(
+                                      child: GridView.builder(
+                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: colunasGrid,
+                                          crossAxisSpacing: 20,
+                                          mainAxisSpacing: 20,
+                                          childAspectRatio: proporcaoCard,
                                         ),
+                                        itemCount: _produtos.length,
+                                        itemBuilder: (context, index) {
+                                          final p = _produtos[index];
+                                          final String urlCompleta = (p['image_url'] ?? p['ImageURL'] ?? p['imageURL'] ?? '').toString();
+                                          List<String> fotos = urlCompleta.split('|||').where((s) => s.isNotEmpty).toList();
+                                          final isHovered = _hoveredIndex == index;
+                                          final String categoria = (p['category'] ?? p['Category'] ?? 'Produtos').toString();
+                                          final double preco = double.tryParse(p['price'].toString()) ?? 0.0;
+                                          final int estoqueAtual = int.tryParse((p['estoque'] ?? p['Estoque'] ?? 0).toString()) ?? 0;
+
+                                          Widget cardWidget = MouseRegion(
+                                            onEnter: (_) => setState(() => _hoveredIndex = index),
+                                            onExit: (_) => setState(() => _hoveredIndex = null),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 200),
+                                              transform: isHovered && !isMobile
+                                                  ? (Matrix4.identity()..translate(0, -6, 0)) 
+                                                  : Matrix4.identity(),
+                                              child: Card(
+                                                elevation: isHovered && !isMobile ? 12 : 4,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                                clipBehavior: Clip.antiAlias,
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Stack(
+                                                        children: [
+                                                          Container(
+                                                            width: double.infinity,
+                                                            color: const Color(0xFFF5F5F5),
+                                                            child: CarrosselFotosWidget(fotos: fotos),
+                                                          ),
+                                                          Positioned(
+                                                            top: 8,
+                                                            left: 8,
+                                                            child: Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                              decoration: BoxDecoration(
+                                                                color: _getBadgeColor(categoria),
+                                                                borderRadius: BorderRadius.circular(12),
+                                                              ),
+                                                              child: Text(
+                                                                categoria.toUpperCase(),
+                                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          Positioned(
+                                                            top: 8,
+                                                            right: 8,
+                                                            child: Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFFFFD700),
+                                                                borderRadius: BorderRadius.circular(12),
+                                                              ),
+                                                              child: Text(
+                                                                'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}',
+                                                                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Padding(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            p['name']?.toString() ?? '',
+                                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4A0E4E)),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            p['description']?.toString() ?? '',
+                                                            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                          const SizedBox(height: 6),
+                                                          Row(
+                                                            children: [
+                                                              Icon(Icons.layers_outlined, size: 14, color: Colors.grey[600]),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                'Estoque: $estoqueAtual',
+                                                                style: TextStyle(color: Colors.grey[700], fontSize: 11, fontWeight: FontWeight.bold),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Divider(height: 1, color: Colors.grey[200]),
+                                                    Container(
+                                                      color: Colors.grey[50],
+                                                      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                                        children: [
+                                                          IconButton(
+                                                            icon: const Icon(Icons.add_box_outlined, color: Colors.green, size: 20),
+                                                            onPressed: () => _abrirDialogEstoque(p),
+                                                          ),
+                                                          IconButton(
+                                                            icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                                                            onPressed: () => _abrirDialogEditar(p),
+                                                          ),
+                                                          IconButton(
+                                                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                                            onPressed: () => _confirmarExclusao(p),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+
+                                          if (index == 0) {
+                                            return Showcase.withWidget(
+                                              key: _keyCard,
+                                              container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false),
+                                              child: cardWidget,
+                                            );
+                                          }
+                                          return cardWidget;
+                                        },
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
-                            ),
-                            _buildControlePaginacao(totalPaginas),
-                          ],
+                                    _buildControlePaginacao(totalPaginas),
+                                  ],
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                bottom: 100,
+                right: 20,
+                child: GestureDetector(
+                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: corTema.withOpacity(0.3),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 5),
+                        )
+                      ]
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: Image.asset(
+                        'assets/images/mascote_acenando.gif',
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 70, height: 70,
+                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
-            ),
-          ],
-        ),
-      ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     );
   }
 }

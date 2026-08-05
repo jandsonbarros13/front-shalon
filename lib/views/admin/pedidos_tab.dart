@@ -6,6 +6,8 @@ import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 class PedidosTab extends StatefulWidget {
   const PedidosTab({super.key});
@@ -16,7 +18,10 @@ class PedidosTab extends StatefulWidget {
 
 class _PedidosTabState extends State<PedidosTab> {
   final _pedidoService = PedidoService();
+  final TextEditingController _buscaController = TextEditingController();
+  
   List<dynamic> _pedidos = [];
+  List<dynamic> _pedidosFiltrados = [];
   int _totalPedidos = 0;
   bool _isLoading = true;
   Timer? _timerAutoRefresh;
@@ -24,9 +29,19 @@ class _PedidosTabState extends State<PedidosTab> {
   int _paginaAtual = 1;
   final int _itensPorPagina = 10;
 
+  final FlutterTts _flutterTts = FlutterTts();
+  final GlobalKey _keyBusca = GlobalKey();
+  final GlobalKey _keyLista = GlobalKey();
+
+  final List<String> _textosMascote = [
+    "Bem-vindo à Fila de Pedidos! Aqui você pode pesquisar rapidamente pelo ID ou nome do cliente.",
+    "Nesta lista ficam todos os pedidos recentes. Clique no ícone de olho para abrir os detalhes, alterar o status e até chamar o cliente no WhatsApp!"
+  ];
+
   @override
   void initState() {
     super.initState();
+    _flutterTts.setLanguage("pt-BR");
     _carregarPedidos();
     _timerAutoRefresh = Timer.periodic(const Duration(seconds: 15), (timer) {
       _carregarPedidos(silencioso: true);
@@ -35,7 +50,9 @@ class _PedidosTabState extends State<PedidosTab> {
 
   @override
   void dispose() {
+    _flutterTts.stop();
     _timerAutoRefresh?.cancel();
+    _buscaController.dispose();
     super.dispose();
   }
 
@@ -52,6 +69,8 @@ class _PedidosTabState extends State<PedidosTab> {
         _totalPedidos = resultado['total'] ?? 0;
         _isLoading = false;
         
+        _filtrarPedidos(_buscaController.text);
+        
         int totalPaginas = (_totalPedidos / _itensPorPagina).ceil();
         if (_paginaAtual > totalPaginas && totalPaginas > 0) {
           _paginaAtual = totalPaginas;
@@ -59,6 +78,24 @@ class _PedidosTabState extends State<PedidosTab> {
         }
       });
     }
+  }
+
+  void _filtrarPedidos(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _pedidosFiltrados = List.from(_pedidos);
+      });
+      return;
+    }
+
+    final q = query.toLowerCase().trim();
+    setState(() {
+      _pedidosFiltrados = _pedidos.where((p) {
+        final nome = (p['cliente_nome'] ?? '').toString().toLowerCase();
+        final id = (p['id'] ?? '').toString();
+        return nome.contains(q) || id.contains(q);
+      }).toList();
+    });
   }
 
   String _formatarTelefone(String telefoneRaw) {
@@ -419,6 +456,181 @@ class _PedidosTabState extends State<PedidosTab> {
     }
   }
 
+  void _playAudioForStep(int? index) async {
+    await _flutterTts.stop();
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (index != null && index >= 0 && index < _textosMascote.length) {
+      await _flutterTts.speak(_textosMascote[index]);
+    }
+  }
+
+  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
+    const corTema = Color(0xFF4A0E4E);
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: corTema, width: 3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    _flutterTts.stop();
+                    ShowCaseWidget.of(context).dismiss();
+                  },
+                  icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: corTema,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: () {
+                    _flutterTts.stop();
+                    if (isLast) {
+                      ShowCaseWidget.of(context).dismiss();
+                    } else {
+                      ShowCaseWidget.of(context).next();
+                    }
+                  },
+                  icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: corTema, width: 3),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(
+                      'assets/images/mascote_acenando.gif',
+                      width: 100, height: 100, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        child: Text(
+                          "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
+                          "Aqui você gerencia todos os pedidos dos clientes. Pode alterar os status, ver detalhes e chamar no WhatsApp!\n\n"
+                          "Quer que eu te mostre como funciona rapidinho?",
+                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: corTema,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          ShowCaseWidget.of(showcaseContext).startShowCase([
+                            _keyBusca,
+                            _keyLista,
+                          ]);
+                        },
+                        icon: const Icon(Icons.slideshow, size: 24),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: corTema,
+                          side: BorderSide(color: corTema, width: 2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      )
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final corTema = const Color(0xFF4A0E4E);
@@ -428,135 +640,214 @@ class _PedidosTabState extends State<PedidosTab> {
     int totalPaginas = (_totalPedidos / _itensPorPagina).ceil();
     if (totalPaginas == 0) totalPaginas = 1;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      appBar: AppBar(
-        title: const Text('Fila de Pedidos', style: TextStyle(fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.white,
-        foregroundColor: corTema,
-        elevation: 1,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Atualizar Lista',
-            onPressed: () => _carregarPedidos(),
+    return ShowCaseWidget(
+      onStart: (index, key) => _playAudioForStep(index),
+      onComplete: (index, key) => _flutterTts.stop(),
+      onFinish: () => _flutterTts.stop(),
+      builder: (showcaseContext) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F6F8),
+          appBar: AppBar(
+            title: const Text('Fila de Pedidos', style: TextStyle(fontWeight: FontWeight.w900)),
+            backgroundColor: Colors.white,
+            foregroundColor: corTema,
+            elevation: 1,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Atualizar Lista',
+                onPressed: () => _carregarPedidos(),
+              ),
+              const SizedBox(width: 16),
+            ],
           ),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            color: Colors.white,
-            child: Row(
-              children: [
-                Container(
-                  width: 50, height: 50,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover)),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4A0E4E))),
-                    Text('Gestão de Pedidos', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: corTema))
-                : _pedidos.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text('Nenhum pedido no momento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey[600]), textAlign: TextAlign.center),
-                            const SizedBox(height: 8),
-                            Text('Aguardando os clientes fazerem pedidos na vitrine...', style: TextStyle(color: Colors.grey[500]), textAlign: TextAlign.center),
+                            Container(
+                              width: 50, height: 50,
+                              decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover)),
+                            ),
+                            const SizedBox(width: 12),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4A0E4E))),
+                                Text('Gestão de Pedidos', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
                           ],
                         ),
-                      )
-                    : Column(
-                        children: [
-                          Expanded(
-                            child: ListView.builder(
-                              padding: EdgeInsets.all(isMobile ? 12.0 : 24.0),
-                              itemCount: _pedidos.length,
-                              itemBuilder: (context, index) {
-                                final p = _pedidos[index];
-                                final double valorTotal = double.tryParse(p['valor_total'].toString()) ?? 0.0;
-                                final String status = p['status'] ?? 'Pendente';
-
-                                return Card(
-                                  elevation: 2,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(color: _getCorStatus(status).withOpacity(0.3), width: 1),
-                                  ),
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: isMobile ? 8.0 : 16.0),
-                                    child: ListTile(
-                                      leading: Container(
-                                        width: 50, height: 50,
-                                        decoration: BoxDecoration(color: _getCorStatus(status).withOpacity(0.1), shape: BoxShape.circle),
-                                        child: Center(
-                                          child: Text('#${p['id']}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _getCorStatus(status))),
-                                        ),
-                                      ),
-                                      title: Text(p['cliente_nome'] ?? 'Cliente', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      subtitle: Padding(
-                                        padding: const EdgeInsets.only(top: 4.0),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                                            const SizedBox(width: 4),
-                                            Text('${p['data']}', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                                            const SizedBox(width: 12),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                              decoration: BoxDecoration(color: _getCorStatus(status), borderRadius: BorderRadius.circular(12)),
-                                              child: Text(status.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (!isMobile)
-                                            Padding(
-                                              padding: const EdgeInsets.only(right: 16.0),
-                                              child: Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
-                                            ),
-                                          Container(
-                                            decoration: BoxDecoration(color: corTema.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                                            child: IconButton(
-                                              icon: Icon(Icons.visibility, color: corTema),
-                                              tooltip: 'Ver Detalhes do Pedido',
-                                              onPressed: () => _mostrarModalDetalhes(p),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                        const SizedBox(height: 16),
+                        Showcase.withWidget(
+                          key: _keyBusca,
+                          container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
+                          child: TextField(
+                            controller: _buscaController,
+                            onChanged: _filtrarPedidos,
+                            decoration: InputDecoration(
+                              hintText: 'Pesquisar por ID da Venda ou Nome do Cliente...',
+                              prefixIcon: const Icon(Icons.search, color: Color(0xFF4A0E4E)),
+                              filled: true,
+                              fillColor: const Color(0xFFF4F6F8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 0),
                             ),
                           ),
-                          _buildControlePaginacao(totalPaginas, corTema),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _isLoading
+                        ? Center(child: CircularProgressIndicator(color: corTema))
+                        : _pedidosFiltrados.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
+                                    const SizedBox(height: 16),
+                                    Text('Nenhum pedido no momento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey[600]), textAlign: TextAlign.center),
+                                    const SizedBox(height: 8),
+                                    Text('Aguardando os clientes fazerem pedidos na vitrine...', style: TextStyle(color: Colors.grey[500]), textAlign: TextAlign.center),
+                                  ],
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(
+                                    child: ListView.builder(
+                                      padding: EdgeInsets.all(isMobile ? 12.0 : 24.0),
+                                      itemCount: _pedidosFiltrados.length,
+                                      itemBuilder: (context, index) {
+                                        final p = _pedidosFiltrados[index];
+                                        final double valorTotal = double.tryParse(p['valor_total'].toString()) ?? 0.0;
+                                        final String status = p['status'] ?? 'Pendente';
+
+                                        Widget cardContent = Card(
+                                          elevation: 2,
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            side: BorderSide(color: _getCorStatus(status).withOpacity(0.3), width: 1),
+                                          ),
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: isMobile ? 8.0 : 16.0),
+                                            child: ListTile(
+                                              leading: Container(
+                                                width: 50, height: 50,
+                                                decoration: BoxDecoration(color: _getCorStatus(status).withOpacity(0.1), shape: BoxShape.circle),
+                                                child: Center(
+                                                  child: Text('#${p['id']}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _getCorStatus(status))),
+                                                ),
+                                              ),
+                                              title: Text(p['cliente_nome'] ?? 'Cliente', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              subtitle: Padding(
+                                                padding: const EdgeInsets.only(top: 4.0),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                                                    const SizedBox(width: 4),
+                                                    Text('${p['data']}', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                                                    const SizedBox(width: 12),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                      decoration: BoxDecoration(color: _getCorStatus(status), borderRadius: BorderRadius.circular(12)),
+                                                      child: Text(status.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (!isMobile)
+                                                    Padding(
+                                                      padding: const EdgeInsets.only(right: 16.0),
+                                                      child: Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
+                                                    ),
+                                                  Container(
+                                                    decoration: BoxDecoration(color: corTema.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                                    child: IconButton(
+                                                      icon: Icon(Icons.visibility, color: corTema),
+                                                      tooltip: 'Ver Detalhes do Pedido',
+                                                      onPressed: () => _mostrarModalDetalhes(p),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        );
+
+                                        if (index == 0) {
+                                          return Showcase.withWidget(
+                                            key: _keyLista,
+                                            container: _buildTooltipMascote(showcaseContext, _textosMascote[1], true),
+                                            child: cardContent,
+                                          );
+                                        }
+                                        return cardContent;
+                                      },
+                                    ),
+                                  ),
+                                  _buildControlePaginacao(totalPaginas, corTema),
+                                ],
+                              ),
+                  ),
+                ],
+              ),
+              Positioned(
+                bottom: 24,
+                right: 24,
+                child: GestureDetector(
+                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: corTema.withOpacity(0.3),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 5),
+                        )
+                      ]
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: Image.asset(
+                        'assets/images/mascote_acenando.gif',
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 70, height: 70,
+                          decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
+                        ),
                       ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      }
     );
   }
 
