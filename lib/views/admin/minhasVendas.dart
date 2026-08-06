@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:html' as html; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
+import 'package:acaiteria_front/features/auth/services/vendas_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -16,7 +17,7 @@ class MinhasVendas extends StatefulWidget {
 }
 
 class _MinhasVendasState extends State<MinhasVendas> {
-  final _pedidoService = PedidoService();
+  final _vendasService = VendasService();
   final TextEditingController _buscaController = TextEditingController();
   
   List<dynamic> _vendas = [];
@@ -26,24 +27,18 @@ class _MinhasVendasState extends State<MinhasVendas> {
   int _paginaAtual = 1;
   bool _temMais = true;
 
-  // Lista de Status Possíveis
   final List<String> _statusValidos = [
-    'Pendente', 
-    'Preparando', 
-    'Pronto', 
-    'Saiu para Entrega', 
     'Finalizado', 
     'Cancelado'
   ];
 
-  // Variáveis do Tour Guiado
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyBusca = GlobalKey();
   final GlobalKey _keyLista = GlobalKey();
 
   final List<String> _textosMascote = [
     "Bem-vindo ao seu Histórico de Vendas! Aqui em cima, você pode digitar o número do cupom ou o nome do cliente para achar uma venda rapidamente.",
-    "Nesta lista ficam os pedidos. Ao clicar na setinha para expandir, você pode alterar o Status do pedido para avisar se está Preparando ou Pronto, e também Reimprimir o Cupom!"
+    "Nesta lista ficam as vendas de balcão (PDV). Clique nos três pontinhos à direita para enviar o cupom via WhatsApp, E-mail, Reimprimir ou Cancelar a venda!"
   ];
 
   @override
@@ -69,31 +64,17 @@ class _MinhasVendasState extends State<MinhasVendas> {
     }
 
     try {
-      final resultado = await _pedidoService.listarPedidos(_paginaAtual);
-      final listagem = resultado['pedidos'] as List? ?? [];
-
-      final apenasPdvValidos = listagem.where((p) {
-        final tipoEntrega = (p['tipo_entrega'] ?? '').toString().toLowerCase();
-        final status = (p['status'] ?? '').toString().toLowerCase();
-        final total = double.tryParse((p['valor_total'] ?? 0).toString()) ?? 0.0;
-
-        // Aceita balcão, pdv ou status ativos (para não sumir quando virar 'preparando')
-        bool ehPdv = tipoEntrega == '' || 
-                     tipoEntrega == 'balcao' || 
-                     tipoEntrega == 'pdv' || 
-                     ['pendente', 'preparando', 'pronto', 'saiu para entrega', 'finalizado'].contains(status);
-        
-        return ehPdv && total > 0;
-      }).toList();
+      final resultado = await _vendasService.listarVendas(_paginaAtual);
+      final listagem = resultado['vendas'] as List? ?? [];
 
       setState(() {
         if (carregarMais) {
-          final listaCompleta = [..._vendas, ...apenasPdvValidos];
+          final listaCompleta = [..._vendas, ...listagem];
           listaCompleta.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
           _vendas = listaCompleta;
         } else {
-          apenasPdvValidos.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
-          _vendas = apenasPdvValidos;
+          listagem.sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
+          _vendas = listagem;
         }
         
         _filtrarVendas(_buscaController.text);
@@ -101,7 +82,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
         _loading = false;
       });
     } catch (_) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -123,22 +104,15 @@ class _MinhasVendasState extends State<MinhasVendas> {
     });
   }
 
-  // Define uma cor bonita baseada no status atual
   Color _getCorStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'pendente': return Colors.amber[700]!;
-      case 'preparando': return Colors.orange;
-      case 'pronto': return Colors.blue;
-      case 'saiu para entrega': return Colors.purple;
       case 'finalizado': return Colors.green;
       case 'cancelado': return Colors.red;
       default: return Colors.grey;
     }
   }
 
-  // Altera o status localmente e tenta salvar no banco
   Future<void> _alterarStatusVenda(int id, String novoStatus) async {
-    // Atualiza a tela instantaneamente para o usuário não ficar esperando
     setState(() {
       final indexOriginal = _vendas.indexWhere((v) => v['id'] == id);
       if (indexOriginal >= 0) _vendas[indexOriginal]['status'] = novoStatus;
@@ -147,20 +121,118 @@ class _MinhasVendasState extends State<MinhasVendas> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Status do Pedido #$id alterado para: $novoStatus!'),
-        backgroundColor: Colors.green,
+        content: Text('Venda #$id alterada para: $novoStatus!'),
+        backgroundColor: novoStatus == 'Cancelado' ? Colors.red : Colors.green,
         duration: const Duration(seconds: 2),
       )
     );
 
     try {
-      // Chama seu service para atualizar no banco (se o método se chamar diferente, ajuste aqui)
-      // Exemplo genérico assumindo que você tem uma função de update:
-      // await _pedidoService.atualizarStatusPedido(id, novoStatus);
+      await _vendasService.atualizarStatus(id, novoStatus);
     } catch (e) {
       debugPrint("Erro ao atualizar status no banco: $e");
     }
   }
+
+  // --- FUNÇÕES DE AÇÃO DOS 3 PONTINHOS ---
+
+  void _dialogWhatsApp(Map<String, dynamic> v) {
+    final telefoneController = TextEditingController(text: v['cliente_telefone'] ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enviar Cupom via WhatsApp', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: telefoneController,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Número com DDD (Ex: 85999999999)', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _enviarWhatsApp(telefoneController.text, v);
+            },
+            child: const Text('Enviar Msg', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _enviarWhatsApp(String telefone, Map<String, dynamic> v) {
+    String telLimpo = telefone.replaceAll(RegExp(r'\D'), '');
+    if (telLimpo.isEmpty) return;
+    if (!telLimpo.startsWith('55') && telLimpo.length >= 10) telLimpo = '55$telLimpo';
+    
+    final total = double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0;
+    final msg = 'Olá! Agradecemos sua compra na *Açaiteria Shalom*.\n\nSeu pedido *#${v['id']}* no valor de *R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}* foi finalizado com sucesso! 🍇\n\nVolte sempre!';
+    
+    final url = 'whatsapp://send?phone=$telLimpo&text=${Uri.encodeComponent(msg)}';
+    html.window.open(url, '_blank');
+  }
+
+  void _dialogEmail(Map<String, dynamic> v) {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enviar Cupom via E-mail', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Endereço de E-mail do Cliente', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _enviarEmail(emailController.text, v);
+            },
+            child: const Text('Enviar E-mail', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _enviarEmail(String email, Map<String, dynamic> v) {
+    if (email.trim().isEmpty) return;
+    
+    final total = double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0;
+    final subject = 'Comprovante de Compra - Açaiteria Shalom #${v['id']}';
+    final body = 'Olá!\n\nAgradecemos sua compra na Açaiteria Shalom.\nSeu pedido #${v['id']} no valor de R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')} foi registrado com sucesso.\n\nVolte sempre! 🍇';
+    
+    final url = 'mailto:$email?subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
+    html.window.open(url, '_blank');
+  }
+
+  void _confirmarCancelarVenda(int id) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancelar Venda', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: Text('Tem certeza de que deseja cancelar a venda de balcão #$id? Esta ação irá alterar as métricas financeiras.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Voltar', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _alterarStatusVenda(id, 'Cancelado');
+            },
+            child: const Text('Sim, Cancelar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------
 
   String _formatarFormaPagamento(String? forma) {
     if (forma == null || forma.isEmpty) return 'Não Especificada';
@@ -173,10 +245,9 @@ class _MinhasVendasState extends State<MinhasVendas> {
     }
   }
 
-  // Lógica do Mascote e Áudio
   void _playAudioForStep(int? index) async {
     await _flutterTts.stop();
-    await Future.delayed(const Duration(milliseconds: 300)); // Previne o engasgo no Chrome
+    await Future.delayed(const Duration(milliseconds: 300));
     if (index != null && index >= 0 && index < _textosMascote.length) {
       await _flutterTts.speak(_textosMascote[index]);
     }
@@ -295,10 +366,10 @@ class _MinhasVendasState extends State<MinhasVendas> {
                         decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
-                          "Esta é a tela de Minhas Vendas. Aqui você pode:\n"
-                          "• Pesquisar vendas por ID ou nome do cliente\n"
-                          "• Atualizar o Status do pedido (Preparando, Pronto...)\n"
-                          "• Reimprimir cupons facilmente\n\n"
+                          "Esta é a tela de Minhas Vendas do PDV. Aqui você pode:\n"
+                          "• Pesquisar vendas por ID ou nome\n"
+                          "• Clicar nos três pontinhos para opções rápidas\n"
+                          "• Enviar o recibo via WhatsApp ou E-mail\n\n"
                           "Quer que eu te mostre como funciona rapidinho?",
                           style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
                         ),
@@ -383,7 +454,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
               ),
               pw.SizedBox(height: 4),
               pw.Center(child: pw.Text('AÇAITERIA SHALOM', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))),
-              pw.Center(child: pw.Text('REIMPRESSÃO DE CUPOM', style: const pw.TextStyle(fontSize: 8, decoration: pw.TextDecoration.underline))),
+              pw.Center(child: pw.Text('REIMPRESSÃO DE CUPOM PDV', style: const pw.TextStyle(fontSize: 8, decoration: pw.TextDecoration.underline))),
               pw.SizedBox(height: 6),
               pw.Text('CUPOM DOC #$id', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
               pw.Text('DATA: $data', style: const pw.TextStyle(fontSize: 9)),
@@ -401,7 +472,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                 final unidade = (item['unidade'] ?? 'Unid').toString();
                 
                 String qtdTexto = unidade.toLowerCase() == 'kg'
-                    ? '${(rawQtd / 1000).toStringAsFixed(3)} kg'
+                    ? '${(rawQtd).toStringAsFixed(3)} kg'
                     : '${rawQtd.toStringAsFixed(0)}x';
 
                 return pw.Padding(
@@ -477,7 +548,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                             const Icon(Icons.analytics_outlined, color: corTema),
                             const SizedBox(width: 8),
                             Text(
-                              'Histórico Balcão (${_vendasFiltradas.length} itens listados)',
+                              'Histórico de Vendas Balcão (${_vendasFiltradas.length} itens listados)',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: corTema),
                             ),
                           ],
@@ -520,7 +591,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                   Text(
                                     _buscaController.text.isNotEmpty 
                                       ? 'Nenhuma venda encontrada para esta pesquisa.'
-                                      : 'Nenhuma venda válida encontrada no Histórico.', 
+                                      : 'Nenhuma venda registrada no PDV ainda.', 
                                     style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.bold)
                                   ),
                                   const SizedBox(height: 16),
@@ -561,12 +632,11 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                 final formaPgto = v['forma_pagamento'] ?? '';
                                 final itens = v['itens'] ?? v['items'] as List? ?? [];
                                 
-                                // Puxa o status, com cor visual 
-                                final statusAtual = (v['status'] ?? 'Pendente').toString();
-                                // Normaliza para achar na lista de _statusValidos (primeira letra maiúscula)
+                                final statusAtual = (v['status'] ?? 'Finalizado').toString();
+                                
                                 final statusFormatado = _statusValidos.firstWhere(
                                   (s) => s.toLowerCase() == statusAtual.toLowerCase(),
-                                  orElse: () => 'Pendente'
+                                  orElse: () => 'Finalizado'
                                 );
                                 final corStatus = _getCorStatus(statusAtual);
 
@@ -587,7 +657,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
-                                        Text('Data: $data | Pagamento: ${_formatarFormaPagamento(formaPgto)}'),
+                                        Text('Data: $data | Pgto: ${_formatarFormaPagamento(formaPgto)}'),
                                         const SizedBox(height: 4),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -619,7 +689,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                               final unidade = (item['unidade'] ?? 'Unid').toString();
 
                                               String qtdTexto = unidade.toLowerCase() == 'kg'
-                                                  ? '${(rawQtd / 1000).toStringAsFixed(3)} kg'
+                                                  ? '${(rawQtd).toStringAsFixed(3)} kg'
                                                   : '${rawQtd.toStringAsFixed(0)}x';
 
                                               return Padding(
@@ -640,7 +710,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                 // Dropdown de Alterar Status
                                                 Row(
                                                   children: [
-                                                    const Text('Alterar Status: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                                                    const Text('Situação: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                                                     Container(
                                                       height: 36,
                                                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -671,17 +741,56 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                   ],
                                                 ),
                                                 
-                                                // Botão de Imprimir
-                                                ElevatedButton.icon(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: corTema,
-                                                    foregroundColor: Colors.white,
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                                // Menu de 3 Pontinhos com Ações Especiais (Somente Ícones)
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    border: Border.all(color: Colors.grey[300]!),
+                                                    borderRadius: BorderRadius.circular(8),
                                                   ),
-                                                  icon: const Icon(Icons.print, size: 18),
-                                                  label: const Text('REIMPRIMIR CUPOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                                  onPressed: () => _reimprimirCupomPdf(v),
+                                                  child: PopupMenuButton<String>(
+                                                    icon: const Icon(Icons.more_vert, color: corTema),
+                                                    tooltip: 'Ações da Venda',
+                                                    offset: const Offset(0, 40),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                    onSelected: (valor) {
+                                                      if (valor == 'wpp') _dialogWhatsApp(v);
+                                                      if (valor == 'email') _dialogEmail(v);
+                                                      if (valor == 'print') _reimprimirCupomPdf(v);
+                                                      if (valor == 'cancel') _confirmarCancelarVenda(id);
+                                                    },
+                                                    itemBuilder: (context) => [
+                                                      PopupMenuItem(
+                                                        enabled: false, // Deixa a linha interativa apenas pelos botões
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            IconButton(
+                                                              icon: const Icon(Icons.message, color: Colors.green), // Substituído Icons.whatsapp por Icons.message
+                                                              tooltip: 'WhatsApp',
+                                                              onPressed: () { Navigator.pop(context); _dialogWhatsApp(v); },
+                                                            ),
+                                                            IconButton(
+                                                              icon: const Icon(Icons.email, color: Colors.blue),
+                                                              tooltip: 'E-mail',
+                                                              onPressed: () { Navigator.pop(context); _dialogEmail(v); },
+                                                            ),
+                                                            IconButton(
+                                                              icon: const Icon(Icons.print, color: Colors.black87),
+                                                              tooltip: 'Reimprimir',
+                                                              onPressed: () { Navigator.pop(context); _reimprimirCupomPdf(v); },
+                                                            ),
+                                                            if (statusFormatado != 'Cancelado')
+                                                              IconButton(
+                                                                icon: const Icon(Icons.cancel, color: Colors.red),
+                                                                tooltip: 'Cancelar',
+                                                                onPressed: () { Navigator.pop(context); _confirmarCancelarVenda(id); },
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -692,7 +801,6 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                   ),
                                 );
 
-                                // No primeiro card renderizado, envelopamos ele com a Luz do Mascote (Tour 2)
                                 if (idx == 0) {
                                   return Showcase.withWidget(
                                     key: _keyLista,
@@ -708,7 +816,6 @@ class _MinhasVendasState extends State<MinhasVendas> {
                 ],
               ),
               
-              // Botão do Mascote Flutuante
               Positioned(
                 bottom: 24,
                 right: 24,

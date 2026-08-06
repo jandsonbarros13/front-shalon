@@ -33,7 +33,7 @@ class _AdminScreenState extends State<AdminScreen> {
     'Dashboard Shalom',
     'Ponto de Venda (PDV)',
     'Histórico de Vendas',
-    'Controle de Tipos/Categorias', // ÍNDICE 3
+    'Controle de Tipos/Categorias',
     'Controle de Produtos',
     'Pedidos da Loja',
     'Catálogo Digital',
@@ -46,7 +46,7 @@ class _AdminScreenState extends State<AdminScreen> {
     const DashboardTab(),
     const VendaPage(),
     const MinhasVendas(),
-    const CategoriasTab(), // ÍNDICE 3
+    const CategoriasTab(),
     const ProdutosTab(),
     const PedidosTab(),
     const CatalogoTab(),
@@ -112,9 +112,7 @@ class _AdminScreenState extends State<AdminScreen> {
           _mostrarNotificacaoVisual();
         }
       }
-    } catch (e) {
-      print("Erro na escuta global: $e");
-    }
+    } catch (e) {}
   }
 
   void _executarSomEVibracao() {
@@ -165,7 +163,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 5); // AJUSTADO PARA O NOVO ÍNDICE (Pedidos)
+                setState(() => _abaSelecionada = 5);
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -198,7 +196,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 5); // AJUSTADO PARA O NOVO ÍNDICE (Pedidos)
+                setState(() => _abaSelecionada = 5);
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -206,6 +204,21 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildItemMenu(IconData icone, String titulo, int indice) {
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      leading: Icon(icone, color: const Color(0xFF4A0E4E), size: 22),
+      title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      selected: _abaSelecionada == indice,
+      selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
+      onTap: () {
+        setState(() => _abaSelecionada = indice);
+        Navigator.pop(context);
+      },
+    );
   }
 
   @override
@@ -224,6 +237,7 @@ class _AdminScreenState extends State<AdminScreen> {
           children: [
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(color: corTema),
+              margin: EdgeInsets.zero,
               currentAccountPicture: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -234,115 +248,31 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                 ),
               ),
-              accountName: const Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              accountEmail: const Text('Painel Administrativo', style: TextStyle(color: Colors.white70)),
+              accountName: const Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              accountEmail: const Text('Painel Administrativo', style: TextStyle(color: Colors.white70, fontSize: 12)),
             ),
-            ListTile(
-              leading: const Icon(Icons.dashboard, color: corTema),
-              title: const Text('Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 0,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 0);
-                Navigator.pop(context);
-              },
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                children: [
+                  _buildItemMenu(Icons.dashboard, 'Dashboard', 0),
+                  _buildItemMenu(Icons.point_of_sale, 'Vendas (PDV)', 1),
+                  _buildItemMenu(Icons.history_toggle_off, 'Minhas Vendas', 2),
+                  _buildItemMenu(Icons.category, 'Categorias / Tipos', 3),
+                  _buildItemMenu(Icons.icecream_outlined, 'Produtos', 4),
+                  _buildItemMenu(Icons.list_alt, 'Pedidos', 5),
+                  _buildItemMenu(Icons.auto_stories, 'Catálogo', 6),
+                  _buildItemMenu(Icons.people, 'Usuários', 7),
+                  _buildItemMenu(Icons.local_shipping, 'Configurar Frete', 8),
+                  _buildItemMenu(Icons.business, 'Empresa', 9),
+                ],
+              ),
             ),
+            const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.point_of_sale, color: corTema),
-              title: const Text('Vendas (PDV)', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 1,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 1);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.history_toggle_off, color: corTema),
-              title: const Text('Minhas Vendas', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 2,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 2);
-                Navigator.pop(context);
-              },
-            ),
-            // === NOVO BOTÃO DAS CATEGORIAS ===
-            ListTile(
-              leading: const Icon(Icons.category, color: corTema),
-              title: const Text('Categorias / Tipos', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 3,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 3);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.icecream_outlined, color: corTema),
-              title: const Text('Produtos', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 4,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 4);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.list_alt, color: corTema),
-              title: const Text('Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 5,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 5);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_stories, color: corTema),
-              title: const Text('Catálogo', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 6,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 6);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.people, color: corTema),
-              title: const Text('Usuários', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 7,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 7);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.local_shipping, color: corTema),
-              title: const Text('Configurar Frete', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 8,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 8);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.business, color: corTema),
-              title: const Text('Empresa', style: TextStyle(fontWeight: FontWeight.bold)),
-              selected: _abaSelecionada == 9,
-              selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
-              onTap: () {
-                setState(() => _abaSelecionada = 9);
-                Navigator.pop(context);
-              },
-            ),
-            const Spacer(),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Sair do Painel', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              dense: true,
+              leading: const Icon(Icons.logout, color: Colors.red, size: 22),
+              title: const Text('Sair do Painel', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
               onTap: () {
                 Navigator.pushReplacement(
                   context,
@@ -350,7 +280,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
           ],
         ),
       ),
