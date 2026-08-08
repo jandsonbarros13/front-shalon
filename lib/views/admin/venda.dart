@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
@@ -24,16 +23,15 @@ class _VendaPageState extends State<VendaPage> {
   final _quantidadeController = TextEditingController(text: '1.000');
   final _nomeClienteController = TextEditingController();
   final _telefoneClienteController = TextEditingController();
+  final _emailClienteController = TextEditingController();
   final _focoCodigo = FocusNode();
 
   List<Map<String, dynamic>> _carrinho = [];
   Map<String, dynamic>? _produtoUltimoLancado;
   bool _buscando = false;
   double _descontoVenda = 0.0;
+  bool _isDarkMode = true; 
 
-  static const Color corTema = Color(0xFF4A0E4E);
-
-  // Variáveis do Tour Guiado
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyBusca = GlobalKey();
   final GlobalKey _keyCarrinho = GlobalKey();
@@ -43,9 +41,16 @@ class _VendaPageState extends State<VendaPage> {
   final List<String> _textosMascote = [
     "Bem-vindo ao Caixa! Na barra superior, digite o nome ou código do produto e aperte Enter. Escolha a quantidade e depois clique em Lançar.",
     "Aqui no centro ficam os itens do pedido. Você pode alterar as quantidades ou excluir algo que tenha lançado errado.",
-    "No menu lateral, coloque o nome e telefone do cliente para enviar o comprovante via WhatsApp! Você também pode aplicar descontos, cancelar itens, cancelar a venda inteira ou lançar um Valor Avulso para vendas rápidas.",
+    "No menu lateral, coloque os dados do cliente, incluindo o e-mail para novidades! Você também pode aplicar descontos, cancelar itens, cancelar a venda inteira ou lançar um Valor Avulso.",
     "Tudo certo? Confira o total e clique em Finalizar Venda para escolher a forma de pagamento e fechar o pedido!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -60,6 +65,7 @@ class _VendaPageState extends State<VendaPage> {
     _quantidadeController.dispose();
     _nomeClienteController.dispose();
     _telefoneClienteController.dispose();
+    _emailClienteController.dispose();
     _focoCodigo.dispose();
     _flutterTts.stop();
     super.dispose();
@@ -80,10 +86,10 @@ class _VendaPageState extends State<VendaPage> {
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -94,12 +100,12 @@ class _VendaPageState extends State<VendaPage> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -107,7 +113,7 @@ class _VendaPageState extends State<VendaPage> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -123,11 +129,11 @@ class _VendaPageState extends State<VendaPage> {
                     _focoCodigo.requestFocus();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -142,7 +148,7 @@ class _VendaPageState extends State<VendaPage> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
             )
@@ -165,9 +171,9 @@ class _VendaPageState extends State<VendaPage> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -179,22 +185,22 @@ class _VendaPageState extends State<VendaPage> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Neste Frente de Caixa (PDV) você pode:\n"
                           "• Buscar produtos e lançar no pedido\n"
                           "• Fazer Lançamento Avulso para vendas rápidas\n"
-                          "• Inserir o WhatsApp do cliente para enviar o cupom\n"
+                          "• Inserir e-mail e WhatsApp do cliente\n"
                           "• Aplicar descontos ou cancelar itens/vendas\n\n"
                           "Quer fazer um Tour Guiado rápido para aprender tudo na prática?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -206,7 +212,7 @@ class _VendaPageState extends State<VendaPage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -221,15 +227,15 @@ class _VendaPageState extends State<VendaPage> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Iniciar Treinamento', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Iniciar Treinamento', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: const BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
@@ -237,7 +243,7 @@ class _VendaPageState extends State<VendaPage> {
                           Navigator.of(ctx).pop();
                           _focoCodigo.requestFocus();
                         },
-                        child: const Text('Apenas Ler (Sair)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Apenas Ler (Sair)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -259,17 +265,20 @@ class _VendaPageState extends State<VendaPage> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Lançar Venda Avulsa (Direta)', style: TextStyle(color: corTema, fontWeight: FontWeight.bold)),
+          backgroundColor: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Lançar Venda Avulsa (Direta)', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nomeController,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
+                style: TextStyle(color: textColor),
+                decoration: InputDecoration(
                   labelText: 'Descrição do Item',
-                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: textSecColor),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -278,10 +287,12 @@ class _VendaPageState extends State<VendaPage> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 autofocus: true,
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Valor Total (R\$)',
+                  labelStyle: TextStyle(color: textSecColor),
                   prefixText: 'R\$ ',
-                  border: OutlineInputBorder(),
+                  prefixStyle: const TextStyle(color: Colors.green, fontSize: 22, fontWeight: FontWeight.bold),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 onSubmitted: (_) {
                   final double? valor = double.tryParse(valorController.text.replaceAll(',', '.'));
@@ -299,7 +310,10 @@ class _VendaPageState extends State<VendaPage> {
               child: const Text('CANCELAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: corTema),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+              ),
               onPressed: () {
                 final double? valor = double.tryParse(valorController.text.replaceAll(',', '.'));
                 if (valor == null || valor <= 0) {
@@ -339,7 +353,7 @@ class _VendaPageState extends State<VendaPage> {
     setState(() => _buscando = true);
 
     try {
-      final resultado = await _produtoService.buscarProdutos(1, nome: termo, limit: 30, semFoto: true);
+      final resultado = await _produtoService.buscarProdutos(1, nome: termo, limit: 30, semFoto: false);
       final List<dynamic> produtosEncontrados = resultado['produtos'] ?? [];
 
       if (produtosEncontrados.isEmpty) {
@@ -364,7 +378,7 @@ class _VendaPageState extends State<VendaPage> {
     if (category.contains('montados') || category.contains('açai') || category.contains('açaí') || nome.contains('açai') || nome.contains('cupuaçu')) {
       setState(() => _buscando = true);
       
-      final resAdicionais = await _produtoService.buscarProdutos(1, limit: 100, semFoto: true);
+      final resAdicionais = await _produtoService.buscarProdutos(1, limit: 100, semFoto: false);
       final List<dynamic> todosProdutos = resAdicionais['produtos'] ?? [];
       
       final adicionaisDisponiveis = todosProdutos.where((p) {
@@ -381,9 +395,8 @@ class _VendaPageState extends State<VendaPage> {
 
   void _abrirModalMontagemAcai(dynamic acaiBase, List<dynamic> adicionais, double qtdInicial) {
     List<Map<String, dynamic>> adicionaisEscolhidos = [];
-    
     final pesoBaseController = TextEditingController(text: qtdInicial.toStringAsFixed(3).replaceAll('.', ','));
-    final Map<int, TextEditingController> controladoresAdicionais = {};
+    int maxGratuitos = int.tryParse(acaiBase['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
 
     showDialog(
       context: context,
@@ -393,45 +406,60 @@ class _VendaPageState extends State<VendaPage> {
           builder: (context, setModalState) {
             double qtdProdutosBase = double.tryParse(pesoBaseController.text.replaceAll(',', '.')) ?? 0.0;
             double precoBaseUnitario = double.tryParse((acaiBase['price'] ?? 0).toString()) ?? 0.0;
-            
             double subtotalBase = precoBaseUnitario * qtdProdutosBase;
             
-            double subtotalAdicionais = 0.0;
+            List<Map<String, dynamic>> singleAddons = [];
             for (var ad in adicionaisEscolhidos) {
-              subtotalAdicionais += (ad['preco'] * ad['quantidade']);
+              int count = ad['quantidade'].toInt();
+              for (int i = 0; i < count; i++) {
+                singleAddons.add(ad);
+              }
+            }
+            singleAddons.sort((a, b) => (a['preco'] as double).compareTo(b['preco'] as double));
+
+            double subtotalAdicionais = 0.0;
+            for (int i = 0; i < singleAddons.length; i++) {
+              if (i >= maxGratuitos) {
+                subtotalAdicionais += singleAddons[i]['preco'];
+              }
             }
             
             double totalDoItemMontado = subtotalBase + subtotalAdicionais;
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'MONTAGEM DE CARDÁPIO: ${(acaiBase['name'] ?? '').toString().toUpperCase()}',
-                        style: const TextStyle(color: corTema, fontWeight: FontWeight.w900, fontSize: 18),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Total da Balança: R\$ ${nav(totalDoItemMontado)}',
-                        style: const TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MONTAGEM: ${(acaiBase['name'] ?? '').toString().toUpperCase()}',
+                          style: TextStyle(color: accentColor, fontWeight: FontWeight.w900, fontSize: 18),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total da Balança: R\$ ${nav(totalDoItemMontado)}',
+                          style: const TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 16),
                   SizedBox(
                     width: 160,
                     child: TextField(
                       controller: pesoBaseController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: corTema),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
                       decoration: InputDecoration(
-                        labelText: 'PESO AÇAÍ (KG)',
-                        labelStyle: const TextStyle(fontSize: 11, color: corTema, fontWeight: FontWeight.bold),
+                        labelText: 'PESO (KG)',
+                        labelStyle: TextStyle(fontSize: 11, color: accentColor, fontWeight: FontWeight.bold),
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
@@ -441,16 +469,23 @@ class _VendaPageState extends State<VendaPage> {
                 ],
               ),
               content: SizedBox(
-                width: 850,
-                height: 500,
+                width: 900,
+                height: 600,
                 child: Row(
                   children: [
                     Expanded(
-                      flex: 5,
+                      flex: 6,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Digite o peso ou quantidade dos adicionais:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Selecione os adicionais (Utilize + e - para alterar a quantidade):', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
+                              if (maxGratuitos > 0)
+                                Text('Você tem $maxGratuitos opções grátis!', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           Expanded(
                             child: ListView.builder(
@@ -460,68 +495,100 @@ class _VendaPageState extends State<VendaPage> {
                                 final precoAd = double.tryParse((ad['price'] ?? 0).toString()) ?? 0.0;
                                 final idAd = ad['id'] ?? ad['ID'];
                                 final unidade = (ad['unidade_medida'] ?? 'Unid').toString();
-                                
+                                final String imgUrl = ad['image_url'] ?? ad['ImageURL'] ?? '';
+                                final List<String> fotos = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
+
                                 final idxEscolhido = adicionaisEscolhidos.indexWhere((item) => item['id'] == idAd);
-                                
-                                if (!controladoresAdicionais.containsKey(idAd)) {
-                                  controladoresAdicionais[idAd] = TextEditingController(text: '0,000');
-                                }
+                                double qtdAtual = idxEscolhido >= 0 ? adicionaisEscolhidos[idxEscolhido]['quantidade'] : 0.0;
 
                                 return Card(
                                   elevation: 0,
-                                  color: idx % 2 == 0 ? Colors.white : const Color(0xFFF8F9FA),
+                                  color: isDark 
+                                    ? (idx % 2 == 0 ? const Color(0xFF1E1E2C) : const Color(0xFF2A2D3E))
+                                    : (idx % 2 == 0 ? Colors.white : const Color(0xFFF8F9FA)),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    side: BorderSide(color: idxEscolhido >= 0 ? corTema : Colors.grey[200]!, width: 1)
+                                    side: BorderSide(color: qtdAtual > 0 ? accentColor : Colors.transparent, width: 1.5)
                                   ),
                                   margin: const EdgeInsets.symmetric(vertical: 3),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     child: Row(
                                       children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: SizedBox(
+                                            width: 45, height: 45,
+                                            child: fotos.isEmpty || fotos.first == 'null'
+                                              ? Container(color: Colors.grey[300], child: const Icon(Icons.fastfood, color: Colors.grey))
+                                              : (fotos.first.startsWith('data:image')
+                                                  ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)
+                                                  : Image.network(fotos.first, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.broken_image)))
+                                          )
+                                        ),
+                                        const SizedBox(width: 12),
                                         Expanded(
-                                          child: ListTile(
-                                            contentPadding: EdgeInsets.zero,
-                                            dense: true,
-                                            title: Text((ad['name'] ?? '').toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                                            subtitle: Text('R\$ ${precoAd.toStringAsFixed(2)} / $unidade'),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text((ad['name'] ?? '').toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                              const SizedBox(height: 2),
+                                              Text('R\$ ${precoAd.toStringAsFixed(2)} / $unidade', style: TextStyle(color: textSecColor, fontSize: 12)),
+                                            ],
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: 120,
-                                          child: TextField(
-                                            controller: controladoresAdicionais[idAd],
-                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                            decoration: InputDecoration(
-                                              hintText: '0,000',
-                                              suffixText: unidade.toLowerCase() == 'grama' || unidade.toLowerCase() == 'kg' ? 'kg' : 'un',
-                                              contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                              border: const OutlineInputBorder(),
-                                            ),
-                                            onChanged: (text) {
-                                              final double val = double.tryParse(text.replaceAll(',', '.')) ?? 0.0;
-                                              setModalState(() {
-                                                if (val > 0) {
-                                                  if (idxEscolhido >= 0) {
-                                                    adicionaisEscolhidos[idxEscolhido]['quantidade'] = val;
-                                                  } else {
-                                                    adicionaisEscolhidos.add({
-                                                      'id': idAd,
-                                                      'nome': ad['name'] ?? '',
-                                                      'preco': precoAd,
-                                                      'quantidade': val,
-                                                      'unidade': unidade,
-                                                    });
-                                                  }
-                                                } else {
-                                                  if (idxEscolhido >= 0) {
-                                                    adicionaisEscolhidos.removeAt(idxEscolhido);
-                                                  }
-                                                }
-                                              });
-                                            },
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
+                                            borderRadius: BorderRadius.circular(8),
+                                            color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              InkWell(
+                                                onTap: qtdAtual > 0 ? () {
+                                                  setModalState(() {
+                                                    if (qtdAtual <= 1) {
+                                                      adicionaisEscolhidos.removeAt(idxEscolhido);
+                                                    } else {
+                                                      adicionaisEscolhidos[idxEscolhido]['quantidade'] -= 1;
+                                                    }
+                                                  });
+                                                } : null,
+                                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  child: Icon(Icons.remove, size: 20, color: qtdAtual > 0 ? Colors.red : Colors.grey[400]),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 30,
+                                                child: Text('${qtdAtual.toInt()}', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: qtdAtual > 0 ? accentColor : Colors.grey)),
+                                              ),
+                                              InkWell(
+                                                onTap: () {
+                                                  setModalState(() {
+                                                    if (idxEscolhido >= 0) {
+                                                      adicionaisEscolhidos[idxEscolhido]['quantidade'] += 1;
+                                                    } else {
+                                                      adicionaisEscolhidos.add({
+                                                        'id': idAd,
+                                                        'nome': ad['name'] ?? '',
+                                                        'preco': precoAd,
+                                                        'quantidade': 1.0,
+                                                        'unidade': unidade,
+                                                      });
+                                                    }
+                                                  });
+                                                },
+                                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  child: Icon(Icons.add, size: 20, color: Colors.green),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -534,29 +601,33 @@ class _VendaPageState extends State<VendaPage> {
                         ],
                       ),
                     ),
-                    const VerticalDivider(width: 24, thickness: 1),
+                    VerticalDivider(width: 24, thickness: 1, color: isDark ? Colors.white10 : Colors.black12),
                     Expanded(
                       flex: 3,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Resumo da Balança:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Text('Resumo da Balança:', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
                           const SizedBox(height: 8),
-                          Text('• AÇAÍ BASE: ${qtdProdutosBase.toStringAsFixed(3)} kg', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                          const Divider(),
+                          Text('• AÇAÍ BASE: ${qtdProdutosBase.toStringAsFixed(3)} kg', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                          Divider(color: isDark ? Colors.white10 : Colors.black12),
                           Expanded(
                             child: adicionaisEscolhidos.isEmpty
-                              ? const Center(child: Text('Nenhum adicional pesado', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)))
+                              ? Center(child: Text('Nenhum adicional selecionado', style: TextStyle(color: isDark ? Colors.white30 : Colors.grey, fontStyle: FontStyle.italic)))
                               : ListView.builder(
                                   itemCount: adicionaisEscolhidos.length,
                                   itemBuilder: (context, i) {
                                     final item = adicionaisEscolhidos[i];
-                                    final formatoQtd = item['quantidade'].toStringAsFixed(3);
+                                    final formatoQtd = item['quantidade'].toInt().toString();
                                     return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 2),
-                                      child: Text(
-                                        '• ${item['nome'].toString().toUpperCase()}: $formatoQtd ${item['unidade']}',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: corTema),
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('• ', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
+                                          Expanded(child: Text('${item['nome'].toString().toUpperCase()} (${item['unidade']})', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor))),
+                                          Text('x$formatoQtd', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                        ],
                                       ),
                                     );
                                   },
@@ -574,7 +645,7 @@ class _VendaPageState extends State<VendaPage> {
                   child: const Text('CANCELAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: corTema, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
+                  style: ElevatedButton.styleFrom(backgroundColor: accentColor, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   onPressed: () {
                     _inserirNoCarrinho(acaiBase, qtdProdutosBase, adicionaisEscolhidos);
                     Navigator.pop(context);
@@ -594,6 +665,8 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _inserirNoCarrinho(dynamic produto, double qtd, List<Map<String, dynamic>> adicionais) {
+    int maxGratuitos = int.tryParse(produto['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+    
     setState(() {
       _produtoUltimoLancado = Map<String, dynamic>.from(produto);
       final idProduto = produto['id'] ?? produto['ID'];
@@ -602,12 +675,27 @@ class _VendaPageState extends State<VendaPage> {
       double subtotalItemCompleto = precoBaseUnitario * qtd;
 
       String nomeCompleto = '${(produto['name'] ?? '').toString().toUpperCase()} (${qtd.toStringAsFixed(3)} KG)';
+      
       if (adicionais.isNotEmpty) {
-        final nomesAdicionais = adicionais.map((a) => '${a['quantidade'].toStringAsFixed(3)} ${a['unidade']} de ${a['nome']}').join(', ');
+        final nomesAdicionais = adicionais.map((a) => '${a['quantidade'].toInt()}x ${a['nome']}').join(', ');
         nomeCompleto += ' COM [$nomesAdicionais]';
+        
+        List<Map<String, dynamic>> singleAddons = [];
         for (var ad in adicionais) {
-          subtotalItemCompleto += (ad['preco'] * ad['quantidade']);
+          int count = ad['quantidade'].toInt();
+          for (int i = 0; i < count; i++) {
+            singleAddons.add(ad);
+          }
         }
+        singleAddons.sort((a, b) => (a['preco'] as double).compareTo(b['preco'] as double));
+
+        double subtotalAdicionais = 0.0;
+        for (int i = 0; i < singleAddons.length; i++) {
+          if (i >= maxGratuitos) {
+            subtotalAdicionais += singleAddons[i]['preco'];
+          }
+        }
+        subtotalItemCompleto += subtotalAdicionais;
       }
 
       _carrinho.add({
@@ -708,8 +796,9 @@ class _VendaPageState extends State<VendaPage> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Selecione o Produto Base', style: TextStyle(color: corTema, fontWeight: FontWeight.bold)),
+          backgroundColor: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Selecione o Produto Base', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900)),
           content: SizedBox(
             width: 500,
             child: ListView.builder(
@@ -718,13 +807,27 @@ class _VendaPageState extends State<VendaPage> {
               itemBuilder: (context, idx) {
                 final prod = produtos[idx];
                 final preco = double.tryParse((prod['price'] ?? 0).toString()) ?? 0.0;
+                final String imgUrl = prod['image_url'] ?? prod['ImageURL'] ?? '';
+                final List<String> fotos = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
 
                 return Card(
+                  color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
-                    title: Text((prod['name'] ?? '').toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Categoria: ${prod['category']} | R\$ ${preco.toStringAsFixed(2)}'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: corTema),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        width: 40, height: 40,
+                        child: fotos.isEmpty || fotos.first == 'null'
+                          ? Container(color: Colors.grey[300], child: const Icon(Icons.fastfood, color: Colors.grey))
+                          : (fotos.first.startsWith('data:image')
+                              ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)
+                              : Image.network(fotos.first, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.broken_image)))
+                      )
+                    ),
+                    title: Text((prod['name'] ?? '').toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                    subtitle: Text('Categoria: ${prod['category']} | R\$ ${preco.toStringAsFixed(2)}', style: TextStyle(color: textSecColor)),
+                    trailing: Icon(Icons.arrow_forward_ios, size: 16, color: accentColor),
                     onTap: () {
                       Navigator.pop(context);
                       _verificarMontagemProduto(prod, qtd);
@@ -750,23 +853,30 @@ class _VendaPageState extends State<VendaPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Aplicar Desconto (R\$)', style: TextStyle(color: corTema, fontWeight: FontWeight.bold)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Aplicar Desconto (R\$)', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900)),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
           autofocus: true,
-          decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Valor do Desconto'),
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), 
+            labelText: 'Valor do Desconto',
+            labelStyle: TextStyle(color: textSecColor),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: corTema),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               setState(() => _descontoVenda = double.tryParse(ctrl.text) ?? 0.0);
               Navigator.pop(context);
               _focoCodigo.requestFocus();
             },
-            child: const Text('Aplicar', style: TextStyle(color: Colors.white)),
+            child: const Text('Aplicar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -778,7 +888,7 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _mensagemPopup(String msg, Color col) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: col));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)), backgroundColor: col, behavior: SnackBarBehavior.floating));
   }
 
   double get _subtotal {
@@ -796,9 +906,10 @@ class _VendaPageState extends State<VendaPage> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Venda Concluída!', style: TextStyle(fontWeight: FontWeight.bold, color: corTema)),
-          content: const Text('Deseja gerar e imprimir o cupom desta venda?'),
+          backgroundColor: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Venda Concluída!', style: TextStyle(fontWeight: FontWeight.w900, color: accentColor)),
+          content: Text('Deseja gerar e imprimir o cupom desta venda?', style: TextStyle(color: textColor)),
           actions: [
             TextButton(
               onPressed: () {
@@ -808,7 +919,7 @@ class _VendaPageState extends State<VendaPage> {
               child: const Text('NÃO', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               onPressed: () async {
                 Navigator.pop(context);
                 await _gerarCupomBalcaoPdf(idVenda, cliente, telefone, formaPgto);
@@ -829,6 +940,7 @@ class _VendaPageState extends State<VendaPage> {
       _descontoVenda = 0;
       _nomeClienteController.clear();
       _telefoneClienteController.clear();
+      _emailClienteController.clear();
     });
     _focoCodigo.requestFocus();
   }
@@ -845,26 +957,31 @@ class _VendaPageState extends State<VendaPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            double valorRecebido = double.tryParse(valorRecebidoController.text) ?? _totalGeral;
+            double valorRecebido = double.tryParse(valorRecebidoController.text.replaceAll(',', '.')) ?? _totalGeral;
             double troco = valorRecebido - _totalGeral;
             if (troco < 0) troco = 0;
 
             return AlertDialog(
+              backgroundColor: cardColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('FECHAMENTO DE CAIXA', style: TextStyle(fontWeight: FontWeight.w900, color: corTema)),
+              title: Text('FECHAMENTO DE CAIXA', style: TextStyle(fontWeight: FontWeight.w900, color: accentColor)),
               content: SizedBox(
                 width: 450,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total da Venda: R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    const Text('Forma de Pagamento:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Text('Total da Venda: R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
+                    const SizedBox(height: 24),
+                    Text('Forma de Pagamento:', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: formaSelecionada,
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      dropdownColor: isDark ? const Color(0xFF1E1E2C) : Colors.white,
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'Dinheiro', child: Text('💵 DINHEIRO')),
                         DropdownMenuItem(value: 'Credito', child: Text('💳 CARTÃO DE CRÉDITO')),
@@ -878,28 +995,32 @@ class _VendaPageState extends State<VendaPage> {
                       },
                     ),
                     if (formaSelecionada == 'Dinheiro') ...[
-                      const SizedBox(height: 20),
-                      const Text('Valor Entregue pelo Cliente:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const SizedBox(height: 24),
+                      Text('Valor Entregue pelo Cliente:', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
                       const SizedBox(height: 8),
                       TextField(
                         controller: valorRecebidoController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(border: OutlineInputBorder(), prefixText: 'R\$ '),
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), 
+                          prefixText: 'R\$ ',
+                          prefixStyle: TextStyle(color: textSecColor, fontSize: 22, fontWeight: FontWeight.bold)
+                        ),
                         onChanged: (text) {
                           setDialogState(() {});
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.amber[50], borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.amber[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.5))),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('TROCO:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
-                            Text('R\$ ${troco.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.red)),
+                            Text('TROCO:', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textColor)),
+                            Text('R\$ ${troco.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 28, color: Colors.red)),
                           ],
                         ),
                       )
@@ -916,13 +1037,14 @@ class _VendaPageState extends State<VendaPage> {
                   child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   onPressed: () async {
                     Navigator.pop(context);
                     setState(() => _buscando = true);
 
                     final nCliente = _nomeClienteController.text.trim().isEmpty ? 'Consumidor Final' : _nomeClienteController.text.trim();
                     final tCliente = _telefoneClienteController.text.trim();
+                    final eCliente = _emailClienteController.text.trim();
 
                     final listaItensMapeados = _carrinho.map((item) => {
                       'produto_id': item['id'],
@@ -934,6 +1056,7 @@ class _VendaPageState extends State<VendaPage> {
                     final dadosVenda = {
                       'cliente_nome': nCliente,
                       'cliente_telefone': tCliente,
+                      'cliente_email': eCliente,
                       'tipo_entrega': 'Balcao',
                       'status': 'Finalizado',
                       'forma_pagamento': formaSelecionada,
@@ -955,13 +1078,51 @@ class _VendaPageState extends State<VendaPage> {
                       _focoCodigo.requestFocus();
                     }
                   },
-                  child: const Text('EMITIR CUPOM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: const Text('EMITIR CUPOM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                 )
               ],
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildTextFieldCustomizado(TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: textSecColor, fontSize: 13),
+          prefixIcon: Icon(icon, color: accentColor, size: 20),
+          filled: true,
+          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _itemMenuCustom(String rotulo, VoidCallback click, Color colorBg, Color colorText) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorBg,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: click,
+          child: Text(rotulo, style: TextStyle(color: colorText, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+        ),
+      ),
     );
   }
 
@@ -976,23 +1137,88 @@ class _VendaPageState extends State<VendaPage> {
       },
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: bgColor,
           body: Stack(
             children: [
               Column(
                 children: [
                   Container(
-                    color: corTema,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: const Row(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark 
+                            ? [const Color(0xFF1E1E2C), const Color(0xFF2A2D3E)] 
+                            : [accentColor, accentColor.withOpacity(0.8)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                      border: Border(bottom: BorderSide(color: accentColor.withOpacity(0.5), width: 2)),
+                    ),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('AÇAITERIA SHALOM - PDV PROFISSIONAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
                         Row(
                           children: [
-                            Icon(Icons.circle, color: Colors.greenAccent, size: 12),
-                            SizedBox(width: 8),
-                            Text('SISTEMA ONLINE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            IconButton(
+                              icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                              tooltip: 'Abrir Menu',
+                              onPressed: () {
+                                context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 45, height: 45,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.white.withOpacity(0.3), blurRadius: 8, spreadRadius: 1)
+                                ],
+                                image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('AÇAITERIA SHALOM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 16)),
+                                Text('PONTO DE VENDA (PDV)', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 10)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: Colors.white),
+                              tooltip: 'Alternar Tema',
+                              onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(color: Colors.greenAccent.withOpacity(0.5)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.point_of_sale, color: Colors.greenAccent, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('CAIXA ABERTO', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                ],
+                              ),
+                            ),
                           ],
                         )
                       ],
@@ -1002,45 +1228,41 @@ class _VendaPageState extends State<VendaPage> {
                     child: Row(
                       children: [
                         Container(
-                          width: 300,
-                          color: const Color(0xFFF8F9FA),
-                          padding: const EdgeInsets.all(16),
+                          width: 320,
+                          color: cardColor,
+                          padding: const EdgeInsets.all(24),
                           child: Showcase.withWidget(
                             key: _keyAcoes,
                             container: _buildTooltipMascote(showcaseContext, _textosMascote[2], false),
                             child: Column(
                               children: [
                                 Container(
-                                  width: 120, height: 120,
-                                  margin: const EdgeInsets.only(bottom: 20),
+                                  width: 130, height: 130,
+                                  margin: const EdgeInsets.only(bottom: 30, top: 10),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: corTema, width: 2),
+                                    boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)],
+                                    border: Border.all(color: accentColor, width: 3),
                                     image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: _nomeClienteController,
-                                  decoration: const InputDecoration(labelText: 'Nome do Cliente', prefixIcon: Icon(Icons.person, color: corTema)),
-                                ),
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: _telefoneClienteController,
-                                  decoration: const InputDecoration(labelText: 'Telefone/WhatsApp', prefixIcon: Icon(Icons.phone, color: corTema)),
-                                ),
+                                _buildTextFieldCustomizado(_nomeClienteController, 'Nome do Cliente', Icons.person),
+                                _buildTextFieldCustomizado(_telefoneClienteController, 'Telefone/WhatsApp', Icons.phone),
+                                _buildTextFieldCustomizado(_emailClienteController, 'E-mail (Novidades/Recibos)', Icons.email),
+                                
                                 const Spacer(),
-                                _itemMenu('LANÇAR VALOR AVULSO', _abrirModalVendaAvulsa, const Color(0xFFE8F5E9)),
-                                _itemMenu('DESCONTO (R\$)', _abrirDialogDesconto, Colors.orange[50]),
-                                _itemMenu('CANCELAR ITEM', () { if (_carrinho.isNotEmpty) setState(() => _carrinho.removeLast()); }, Colors.red[50]),
-                                _itemMenu('CANCELAR VENDA', () { setState(() { _carrinho.clear(); _produtoUltimoLancado = null; _descontoVenda = 0; }); }, Colors.red[100]),
+                                
+                                _itemMenuCustom('LANÇAR VALOR AVULSO', _abrirModalVendaAvulsa, isDark ? Colors.green.withOpacity(0.2) : const Color(0xFFE8F5E9), Colors.green),
+                                _itemMenuCustom('DESCONTO (R\$)', _abrirDialogDesconto, isDark ? Colors.orange.withOpacity(0.2) : Colors.orange[50]!, Colors.orange),
+                                _itemMenuCustom('CANCELAR ITEM', () { if (_carrinho.isNotEmpty) setState(() => _carrinho.removeLast()); }, isDark ? Colors.red.withOpacity(0.1) : Colors.red[50]!, Colors.redAccent),
+                                _itemMenuCustom('CANCELAR VENDA', () { setState(() { _carrinho.clear(); _produtoUltimoLancado = null; _descontoVenda = 0; _nomeClienteController.clear(); _telefoneClienteController.clear(); _emailClienteController.clear(); }); }, isDark ? Colors.red.withOpacity(0.2) : Colors.red[100]!, Colors.red),
                               ],
                             ),
                           ),
                         ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.all(25),
+                            padding: const EdgeInsets.all(30),
                             child: Column(
                               children: [
                                 Showcase.withWidget(
@@ -1053,124 +1275,169 @@ class _VendaPageState extends State<VendaPage> {
                                         child: TextField(
                                           controller: _codigoInputController,
                                           focusNode: _focoCodigo,
-                                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                                          decoration: const InputDecoration(
+                                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+                                          decoration: InputDecoration(
                                             labelText: 'CÓDIGO OU NOME DO PRODUTO (BASE)',
-                                            labelStyle: TextStyle(fontSize: 14),
-                                            border: OutlineInputBorder(),
-                                            filled: true, fillColor: Color(0xFFF1F3F4),
+                                            labelStyle: TextStyle(fontSize: 13, color: textSecColor),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!)),
+                                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!)),
+                                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accentColor, width: 2)),
+                                            filled: true, fillColor: cardColor,
+                                            contentPadding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
                                           ),
                                           onSubmitted: (_) => _tentarLancarProduto(),
                                         ),
                                       ),
-                                      const SizedBox(width: 15),
+                                      const SizedBox(width: 16),
                                       Expanded(
                                         flex: 1,
                                         child: TextField(
                                           controller: _quantidadeController,
                                           keyboardType: TextInputType.number,
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                                          decoration: const InputDecoration(labelText: 'PESO (KG)', border: OutlineInputBorder()),
+                                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+                                          decoration: InputDecoration(
+                                            labelText: 'PESO (KG)',
+                                            labelStyle: TextStyle(fontSize: 13, color: textSecColor),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!)),
+                                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!)),
+                                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accentColor, width: 2)),
+                                            filled: true, fillColor: cardColor,
+                                            contentPadding: const EdgeInsets.symmetric(vertical: 22),
+                                          ),
                                           onSubmitted: (_) => _tentarLancarProduto(),
                                         ),
                                       ),
-                                      const SizedBox(width: 15),
+                                      const SizedBox(width: 16),
                                       ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: corTema,
-                                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                                          backgroundColor: accentColor,
+                                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 22),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                                         ),
                                         onPressed: _tentarLancarProduto,
-                                        child: const Text('LANÇAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                        child: const Text('LANÇAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
                                       )
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 25),
+                                const SizedBox(height: 30),
                                 Expanded(
                                   child: Showcase.withWidget(
                                     key: _keyCarrinho,
                                     container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey[200]!),
-                                        color: const Color(0xFFFCFCFC),
+                                        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!, width: 2),
+                                        borderRadius: BorderRadius.circular(16),
+                                        color: cardColor,
                                       ),
                                       child: _carrinho.isEmpty
-                                        ? Center(child: Text('CAIXA AGUARDANDO LANÇAMENTO...', style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold, letterSpacing: 2)))
-                                        : ListView.builder(
-                                            itemCount: _carrinho.length,
-                                            itemBuilder: (context, idx) {
-                                              final item = _carrinho[idx];
-                                              return Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                        ? Center(child: Text('CAIXA AGUARDANDO LANÇAMENTO...', style: TextStyle(color: isDark ? Colors.white30 : Colors.grey[400], fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)))
+                                        : Column(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                                 decoration: BoxDecoration(
-                                                  color: idx % 2 == 0 ? Colors.white : const Color(0xFFF9F9F9),
-                                                  border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+                                                  border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!, width: 2)),
                                                 ),
                                                 child: Row(
                                                   children: [
-                                                    Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.bold, color: corTema)),
-                                                    const SizedBox(width: 20),
-                                                    Expanded(child: Text(item['nome'].toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                                                    Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        IconButton(
-                                                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                                                          onPressed: () {
-                                                            if (item['quantidade'] > 1) {
-                                                              _addAoCarrinhoBotoes(item, item['quantidade'] - 1);
-                                                            } else {
-                                                              setState(() => _carrinho.removeAt(idx));
-                                                            }
-                                                          },
-                                                        ),
-                                                        Text('${item['quantidade'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-                                                          onPressed: () => _addAoCarrinhoBotoes(item, item['quantidade'] + 1),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(width: 30),
-                                                    Text('R\$ ${(item['preco'] * item['quantidade']).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
-                                                    const SizedBox(width: 10),
-                                                    IconButton(
-                                                      icon: const Icon(Icons.delete_forever, color: Colors.red, size: 20),
-                                                      onPressed: () => setState(() => _carrinho.removeAt(idx)),
-                                                    )
+                                                    Text('ITEM', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor, fontSize: 12)),
+                                                    const Spacer(),
+                                                    Text('QTD', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor, fontSize: 12)),
+                                                    const SizedBox(width: 80),
+                                                    Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor, fontSize: 12)),
+                                                    const SizedBox(width: 60),
                                                   ],
                                                 ),
-                                              );
-                                            },
+                                              ),
+                                              Expanded(
+                                                child: ListView.builder(
+                                                  itemCount: _carrinho.length,
+                                                  itemBuilder: (context, idx) {
+                                                    final item = _carrinho[idx];
+                                                    return Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                                                      decoration: BoxDecoration(
+                                                        color: isDark 
+                                                          ? (idx % 2 == 0 ? Colors.transparent : const Color(0xFF1E1E2C))
+                                                          : (idx % 2 == 0 ? Colors.transparent : const Color(0xFFF9F9F9)),
+                                                        border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : const Color(0xFFEEEEEE))),
+                                                      ),
+                                                      child: Row(
+                                                        children: [
+                                                          Container(
+                                                            width: 30, height: 30,
+                                                            alignment: Alignment.center,
+                                                            decoration: BoxDecoration(color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                                            child: Text('${idx + 1}', style: TextStyle(fontWeight: FontWeight.w900, color: accentColor)),
+                                                          ),
+                                                          const SizedBox(width: 20),
+                                                          Expanded(child: Text(item['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor))),
+                                                          Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              IconButton(
+                                                                icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 24),
+                                                                onPressed: () {
+                                                                  if (item['quantidade'] > 1) {
+                                                                    _addAoCarrinhoBotoes(item, item['quantidade'] - 1);
+                                                                  } else {
+                                                                    setState(() => _carrinho.removeAt(idx));
+                                                                  }
+                                                                },
+                                                              ),
+                                                              SizedBox(width: 30, child: Text('${item['quantidade'].toStringAsFixed(0)}', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textColor))),
+                                                              IconButton(
+                                                                icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 24),
+                                                                onPressed: () => _addAoCarrinhoBotoes(item, item['quantidade'] + 1),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(width: 40),
+                                                          SizedBox(
+                                                            width: 100,
+                                                            child: Text('R\$ ${(item['preco'] * item['quantidade']).toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: accentColor), textAlign: TextAlign.right),
+                                                          ),
+                                                          const SizedBox(width: 20),
+                                                          IconButton(
+                                                            icon: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
+                                                            onPressed: () => setState(() => _carrinho.removeAt(idx)),
+                                                          )
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 30),
                                 Showcase.withWidget(
                                   key: _keyFinalizar,
                                   container: _buildTooltipMascote(showcaseContext, _textosMascote[3], true),
                                   child: Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 25),
+                                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 20, offset: const Offset(0, 5))]),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text('Subtotal: R\$ ${_subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
-                                            Text('Desconto: R\$ ${_descontoVenda.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.red)),
+                                            Text('Subtotal: R\$ ${_subtotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: 16, color: textSecColor, fontWeight: FontWeight.bold)),
+                                            const SizedBox(height: 4),
+                                            Text('Desconto: R\$ ${_descontoVenda.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontSize: 16, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                           ],
                                         ),
                                         Row(
                                           children: [
-                                            const Text('TOTAL: ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
-                                            Text('R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w900, color: corTema)),
+                                            Text('TOTAL: ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textSecColor)),
+                                            Text('R\$ ${_totalGeral.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: 50, fontWeight: FontWeight.w900, color: accentColor)),
                                           ],
                                         ),
                                         ElevatedButton.icon(
@@ -1180,8 +1447,8 @@ class _VendaPageState extends State<VendaPage> {
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                                           ),
                                           onPressed: _finalizarVenda,
-                                          icon: const Icon(Icons.check_circle, color: Colors.black, size: 30),
-                                          label: const Text('FINALIZAR VENDA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
+                                          icon: const Icon(Icons.check_circle, color: Colors.black, size: 28),
+                                          label: const Text('FINALIZAR VENDA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1)),
                                         )
                                       ],
                                     ),
@@ -1196,10 +1463,8 @@ class _VendaPageState extends State<VendaPage> {
                   )
                 ],
               ),
-              
-              // Botão do Mascote Flutuante
               Positioned(
-                bottom: 120, // Subi um pouco para não ficar em cima do Finalizar Venda
+                bottom: 120, 
                 right: 40,
                 child: GestureDetector(
                   onTap: () => _mostrarMensagemMascote(showcaseContext),
@@ -1208,8 +1473,8 @@ class _VendaPageState extends State<VendaPage> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
-                          blurRadius: 15,
+                          color: accentColor.withOpacity(0.5),
+                          blurRadius: 20,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
                         )
@@ -1219,13 +1484,13 @@ class _VendaPageState extends State<VendaPage> {
                       borderRadius: BorderRadius.circular(100),
                       child: Image.asset(
                         'assets/images/mascote_acenando.gif',
-                        width: 70,
-                        height: 70,
+                        width: 80,
+                        height: 80,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
-                          width: 70, height: 70,
-                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
-                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
+                          width: 80, height: 80,
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
+                          child: const Icon(Icons.help_outline, color: Colors.white, size: 40),
                         ),
                       ),
                     ),
@@ -1236,26 +1501,6 @@ class _VendaPageState extends State<VendaPage> {
           ),
         );
       },
-    );
-  }
-
-  Widget _itemMenu(String rotulo, VoidCallback click, Color? fundo) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: SizedBox(
-        width: double.infinity,
-        height: 45,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: fundo,
-            elevation: 0,
-            side: BorderSide(color: Colors.grey[300]!),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          onPressed: click,
-          child: Text(rotulo, style: const TextStyle(color: corTema, fontWeight: FontWeight.bold, fontSize: 12)),
-        ),
-      ),
     );
   }
 }

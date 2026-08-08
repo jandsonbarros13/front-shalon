@@ -38,6 +38,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   bool _isSaving = false;
   bool _loadingDados = false; 
   bool _isUploadingImage = false;
+  bool _isDarkMode = true;
 
   List<dynamic> _resultadosBusca = [];
   bool _buscaRealizada = false;
@@ -58,6 +59,13 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     "Se for um Açaí, Creme ou Combo, você pode pesquisar e selecionar os adicionais aqui. Use as setas laterais para descer a lista se o mouse não estiver ajudando!",
     "Depois de adicionar uma foto bem bonita, clique aqui embaixo em Salvar para colocar o produto no cardápio!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -160,7 +168,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
         }
       }
     } catch (e) {
-      print('Erro ao carregar categorias da API: $e');
+      debugPrint('Erro ao carregar categorias da API: $e');
     }
   }
 
@@ -169,22 +177,27 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nova Categoria'),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Nova Categoria', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
             hintText: 'Ex: Sobremesas', 
-            border: OutlineInputBorder()
+            hintStyle: TextStyle(color: textSecColor),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
           ),
           textCapitalization: TextCapitalization.words,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx), 
-            child: const Text('Cancelar')
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey))
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), 
             child: const Text('Adicionar')
           ),
@@ -247,17 +260,16 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   }
 
   Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
-    const corTema = Color(0xFF4A0E4E);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -268,12 +280,12 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -281,7 +293,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -296,11 +308,11 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -314,17 +326,17 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -337,9 +349,9 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -351,18 +363,18 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Aqui é onde a mágica acontece. Você pode criar novos produtos, escolher quais adicionais eles têm e ajustar tudo direitinho!\n\n"
                           "Quer fazer um Tour Guiado rápido?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -374,7 +386,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -388,20 +400,20 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -439,7 +451,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
           }
         }
       } catch (e) {
-        print("Erro ao processar a imagem: $e");
+        debugPrint("Erro ao processar a imagem: $e");
       } finally {
         setState(() => _isUploadingImage = false); 
       }
@@ -482,17 +494,16 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
         dadosProduto['id'] = resultado['id'];
       }
       _cache.invalidarEAtualizar(dadosProduto);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo com sucesso!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar o produto.'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar o produto.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bool isEdit = widget.produtoParaEditar != null;
-    const corTema = Color(0xFF4A0E4E);
 
     return ShowCaseWidget(
       onStart: (index, key) => _playAudioForStep(index),
@@ -500,8 +511,20 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F8),
-          appBar: AppBar(backgroundColor: corTema, foregroundColor: Colors.white, title: Text(isEdit ? 'Editar Produto' : 'Novo Produto', style: const TextStyle(fontWeight: FontWeight.w900))),
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: cardColor, 
+            foregroundColor: textColor, 
+            elevation: 1,
+            title: Text(isEdit ? 'EDITAR PRODUTO' : 'NOVO PRODUTO', style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16)),
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+            ],
+          ),
           body: Stack(
             children: [
               Positioned.fill(
@@ -512,7 +535,13 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                       constraints: const BoxConstraints(maxWidth: 750),
                       padding: const EdgeInsets.all(16.0),
                       child: Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        color: cardColor,
+                        shadowColor: Colors.black.withOpacity(0.1),
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(24.0),
                           child: Form(
@@ -526,11 +555,19 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(isEdit ? 'Atualizar Dados' : 'Cadastrar Novo Produto', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: corTema)),
+                                      Text(isEdit ? 'Atualizar Dados' : 'Cadastrar Novo Produto', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: accentColor)),
                                       const SizedBox(height: 16),
                                       TextFormField(
                                         controller: _nomeController,
-                                        decoration: const InputDecoration(labelText: 'Nome do Produto', prefixIcon: Icon(Icons.shopping_bag_outlined, color: corTema), border: OutlineInputBorder()),
+                                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                        decoration: InputDecoration(
+                                          labelText: 'Nome do Produto', 
+                                          labelStyle: TextStyle(color: textSecColor),
+                                          prefixIcon: Icon(Icons.shopping_bag_outlined, color: accentColor), 
+                                          filled: true,
+                                          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                        ),
                                         validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
                                       ),
                                       const SizedBox(height: 16),
@@ -539,12 +576,21 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                           Expanded(
                                             child: DropdownButtonFormField<String>(
                                               value: _categorias.contains(_categoria) ? _categoria : (_categorias.isNotEmpty ? _categorias.first : null),
-                                              decoration: const InputDecoration(labelText: 'Categoria', prefixIcon: Icon(Icons.category_outlined, color: corTema), border: OutlineInputBorder()),
+                                              dropdownColor: cardColor,
+                                              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                              decoration: InputDecoration(
+                                                labelText: 'Categoria', 
+                                                labelStyle: TextStyle(color: textSecColor),
+                                                prefixIcon: Icon(Icons.category_outlined, color: accentColor), 
+                                                filled: true,
+                                                fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                              ),
                                               items: [
                                                 ..._categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))),
-                                                const DropdownMenuItem(
+                                                DropdownMenuItem(
                                                   value: 'nova_categoria', 
-                                                  child: Row(children: [Icon(Icons.add_circle_outline, size: 18, color: corTema), SizedBox(width: 8), Text('Nova Categoria...', style: TextStyle(color: corTema, fontWeight: FontWeight.bold))])
+                                                  child: Row(children: [Icon(Icons.add_circle_outline, size: 18, color: accentColor), const SizedBox(width: 8), Text('Nova Categoria...', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold))])
                                                 ),
                                               ],
                                               onChanged: (v) async {
@@ -580,7 +626,16 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                           Expanded(
                                             child: DropdownButtonFormField<String>(
                                               value: _unidadeMedida,
-                                              decoration: const InputDecoration(labelText: 'Venda por', prefixIcon: Icon(Icons.scale_outlined, color: corTema), border: OutlineInputBorder()),
+                                              dropdownColor: cardColor,
+                                              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                              decoration: InputDecoration(
+                                                labelText: 'Venda por', 
+                                                labelStyle: TextStyle(color: textSecColor),
+                                                prefixIcon: Icon(Icons.scale_outlined, color: accentColor), 
+                                                filled: true,
+                                                fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                              ),
                                               items: _unidades.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                                               onChanged: (v) => setState(() => _unidadeMedida = v!),
                                             ),
@@ -588,7 +643,18 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                         ],
                                       ),
                                       const SizedBox(height: 16),
-                                      TextFormField(controller: _descricaoController, maxLines: 2, decoration: const InputDecoration(labelText: 'Descrição', border: OutlineInputBorder())),
+                                      TextFormField(
+                                        controller: _descricaoController, 
+                                        maxLines: 2, 
+                                        style: TextStyle(color: textColor),
+                                        decoration: InputDecoration(
+                                          labelText: 'Descrição', 
+                                          labelStyle: TextStyle(color: textSecColor),
+                                          filled: true,
+                                          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                        )
+                                      ),
                                       const SizedBox(height: 16),
                                       Row(
                                         children: [
@@ -596,7 +662,15 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                             child: TextFormField(
                                               controller: _precoController,
                                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                              decoration: const InputDecoration(labelText: 'Preço (R\$)', prefixIcon: Icon(Icons.attach_money, color: corTema), border: OutlineInputBorder()),
+                                              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                              decoration: InputDecoration(
+                                                labelText: 'Preço (R\$)', 
+                                                labelStyle: TextStyle(color: textSecColor),
+                                                prefixIcon: Icon(Icons.attach_money, color: accentColor), 
+                                                filled: true,
+                                                fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                              ),
                                               validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
                                             ),
                                           ),
@@ -606,7 +680,15 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                               controller: _estoqueController,
                                               keyboardType: TextInputType.number,
                                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                              decoration: const InputDecoration(labelText: 'Estoque', prefixIcon: Icon(Icons.inventory_2_outlined, color: corTema), border: OutlineInputBorder()),
+                                              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                              decoration: InputDecoration(
+                                                labelText: 'Estoque', 
+                                                labelStyle: TextStyle(color: textSecColor),
+                                                prefixIcon: Icon(Icons.inventory_2_outlined, color: accentColor), 
+                                                filled: true,
+                                                fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                              ),
                                               validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
                                             ),
                                           ),
@@ -621,17 +703,22 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                     controller: _maxAdicionaisGratuitosController,
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                    decoration: const InputDecoration(
+                                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                    decoration: InputDecoration(
                                       labelText: 'Qtd. de Adicionais Gratuitos',
                                       helperText: 'Ex: 3 (Os 3 primeiros são grátis, o 4º em diante cobra o valor do item)',
-                                      prefixIcon: Icon(Icons.star_outline, color: corTema),
-                                      border: OutlineInputBorder(),
+                                      helperStyle: TextStyle(color: textSecColor),
+                                      labelStyle: TextStyle(color: textSecColor),
+                                      prefixIcon: Icon(Icons.star_outline, color: accentColor),
+                                      filled: true,
+                                      fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                     ),
                                   ),
                                   const SizedBox(height: 16),
                                 ],
                                 if (_categoria == 'Açai' || _categoria == 'Combos' || _categoria == 'Cremes') ...[
-                                  const Divider(),
+                                  Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                                   const SizedBox(height: 8),
                                   Showcase.withWidget(
                                     key: _keyLista,
@@ -639,16 +726,20 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text((_categoria == 'Açai' || _categoria == 'Cremes') ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: const TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
+                                        Text((_categoria == 'Açai' || _categoria == 'Cremes') ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
                                         const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             Expanded(
                                               child: TextField(
                                                 controller: _buscaFiltroController,
+                                                style: TextStyle(color: textColor),
                                                 decoration: InputDecoration(
                                                   hintText: 'Digite o nome para buscar...', 
-                                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                  hintStyle: TextStyle(color: textSecColor),
+                                                  filled: true,
+                                                  fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                                 ),
                                                 onSubmitted: (_) => _executarPesquisaAPI(),
@@ -658,7 +749,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                             SizedBox(
                                               height: 48,
                                               child: ElevatedButton.icon(
-                                                style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                                style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                                                 onPressed: _executarPesquisaAPI,
                                                 icon: const Icon(Icons.search),
                                                 label: const Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -668,15 +759,15 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                         ),
                                         const SizedBox(height: 12),
                                         if (_loadingDados)
-                                          const SizedBox(height: 110, child: Center(child: CircularProgressIndicator(color: corTema)))
+                                          SizedBox(height: 110, child: Center(child: CircularProgressIndicator(color: accentColor)))
                                         else if (_buscaRealizada || isEdit)
                                           SizedBox(
                                             height: 300, 
                                             child: _resultadosBusca.isEmpty 
-                                                ? const Center(child: Text('Nenhum item encontrado na pesquisa.', style: TextStyle(fontSize: 14, color: Colors.grey)))
+                                                ? Center(child: Text('Nenhum item encontrado na pesquisa.', style: TextStyle(fontSize: 14, color: textSecColor)))
                                                 : Container(
                                                     decoration: BoxDecoration(
-                                                      border: Border.all(color: Colors.grey[200]!),
+                                                      border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
                                                       borderRadius: BorderRadius.circular(12),
                                                     ),
                                                     child: Row(
@@ -686,7 +777,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                             controller: _scrollAdicionaisCtrl,
                                                             padding: const EdgeInsets.all(12),
                                                             itemCount: _resultadosBusca.length,
-                                                            separatorBuilder: (context, index) => const Divider(height: 16),
+                                                            separatorBuilder: (context, index) => Divider(height: 16, color: isDark ? Colors.white10 : Colors.grey[200]),
                                                             itemBuilder: (context, index) {
                                                               final item = _resultadosBusca[index];
                                                               final int id = item['id'] ?? item['ID'];
@@ -717,7 +808,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                                       child: SizedBox(
                                                                         width: 50, height: 50,
                                                                         child: f.isEmpty || f.first == 'null'
-                                                                            ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
+                                                                            ? Container(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
                                                                             : (f.first.startsWith('data:image') 
                                                                                 ? Image.memory(base64Decode(f.first.split(',')[1]), fit: BoxFit.cover)
                                                                                 : Image.network(f.first, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: Colors.grey[400])))
@@ -728,9 +819,9 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                                       child: Column(
                                                                         crossAxisAlignment: CrossAxisAlignment.start,
                                                                         children: [
-                                                                          Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                                                          Text(adNome, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor), maxLines: 2, overflow: TextOverflow.ellipsis),
                                                                           const SizedBox(height: 4),
-                                                                          Text(textoPreco, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+                                                                          Text(textoPreco, style: TextStyle(color: textSecColor, fontWeight: FontWeight.bold, fontSize: 13)),
                                                                         ],
                                                                       ),
                                                                     ),
@@ -738,8 +829,8 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                                       width: 24, height: 24,
                                                                       decoration: BoxDecoration(
                                                                         shape: BoxShape.circle,
-                                                                        border: Border.all(color: sel ? corTema : Colors.grey[400]!, width: 2),
-                                                                        color: sel ? corTema : Colors.transparent,
+                                                                        border: Border.all(color: sel ? accentColor : Colors.grey[400]!, width: 2),
+                                                                        color: sel ? accentColor : Colors.transparent,
                                                                       ),
                                                                       child: sel ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
                                                                     )
@@ -752,8 +843,8 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                         Container(
                                                           width: 40,
                                                           decoration: BoxDecoration(
-                                                            border: Border(left: BorderSide(color: Colors.grey[200]!)),
-                                                            color: Colors.grey[50],
+                                                            border: Border(left: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!)),
+                                                            color: isDark ? const Color(0xFF1A1A24) : Colors.grey[50],
                                                             borderRadius: const BorderRadius.horizontal(right: Radius.circular(12))
                                                           ),
                                                           child: Column(
@@ -761,14 +852,14 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                               Expanded(
                                                                 child: InkWell(
                                                                   onTap: () => _scrollAdicionais(-200),
-                                                                  child: const Center(child: Icon(Icons.arrow_drop_up, size: 32, color: corTema)),
+                                                                  child: Center(child: Icon(Icons.arrow_drop_up, size: 32, color: accentColor)),
                                                                 ),
                                                               ),
-                                                              const Divider(height: 1),
+                                                              Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[300]),
                                                               Expanded(
                                                                 child: InkWell(
                                                                   onTap: () => _scrollAdicionais(200),
-                                                                  child: const Center(child: Icon(Icons.arrow_drop_down, size: 32, color: corTema)),
+                                                                  child: Center(child: Icon(Icons.arrow_drop_down, size: 32, color: accentColor)),
                                                                 ),
                                                               ),
                                                             ]
@@ -779,18 +870,18 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                   ),
                                           )
                                         else
-                                          const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text('Use o campo acima para pesquisar itens.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)))),
+                                          Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text('Use o campo acima para pesquisar itens.', style: TextStyle(color: textSecColor, fontStyle: FontStyle.italic)))),
                                       ],
                                     ),
                                   ),
                                 ],
                                 const SizedBox(height: 16),
-                                const Divider(),
+                                Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                                 const SizedBox(height: 8),
-                                const Text('Fotos do Produto', style: TextStyle(color: corTema, fontSize: 14, fontWeight: FontWeight.bold)),
+                                Text('Fotos do Produto', style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 12),
                                 _loadingDados
-                                    ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: corTema))))
+                                    ? Center(child: Padding(padding: const EdgeInsets.all(8.0), child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: accentColor))))
                                     : Wrap(
                                         spacing: 8, runSpacing: 8,
                                         children: [
@@ -802,7 +893,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                               children: [
                                                 Container(
                                                   width: 85, height: 85,
-                                                  decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
+                                                  decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[200], borderRadius: BorderRadius.circular(8), border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!)),
                                                   child: ClipRRect(
                                                     borderRadius: BorderRadius.circular(8),
                                                     child: f.startsWith('data:image')
@@ -815,10 +906,10 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                             );
                                           }),
                                           _isUploadingImage
-                                              ? Container(width: 85, height: 85, decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: corTema.withOpacity(0.3))), child: const Center(child: CircularProgressIndicator(color: corTema, strokeWidth: 2)))
+                                              ? Container(width: 85, height: 85, decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: accentColor.withOpacity(0.3))), child: Center(child: CircularProgressIndicator(color: accentColor, strokeWidth: 2)))
                                               : InkWell(
                                                   onTap: _escolherFoto,
-                                                  child: Container(width: 85, height: 85, decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: corTema.withOpacity(0.3))), child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo, color: corTema, size: 24), SizedBox(height: 4), Text('Adicionar', style: TextStyle(color: corTema, fontSize: 10, fontWeight: FontWeight.bold))])),
+                                                  child: Container(width: 85, height: 85, decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(8), border: Border.all(color: accentColor.withOpacity(0.3))), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo, color: accentColor, size: 24), const SizedBox(height: 4), Text('Adicionar', style: TextStyle(color: accentColor, fontSize: 10, fontWeight: FontWeight.bold))])),
                                                 ),
                                         ],
                                       ),
@@ -830,7 +921,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                     width: double.infinity,
                                     height: 46,
                                     child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                                      style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
                                       onPressed: _isSaving ? null : _salvar,
                                       icon: _isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_outlined),
                                       label: Text(isEdit ? 'SALVAR ALTERAÇÕES' : 'CADASTRAR PRODUTO', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -850,13 +941,13 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                 bottom: 24,
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
+                          color: accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
@@ -872,7 +963,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),

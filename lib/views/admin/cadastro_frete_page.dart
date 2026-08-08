@@ -14,6 +14,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
   final _freteService = FreteService();
   bool _carregando = true;
   List<dynamic> _bairros = [];
+  bool _isDarkMode = true;
 
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyLista = GlobalKey();
@@ -21,6 +22,13 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
   final List<String> _textosMascote = [
     "Nesta tela você controla as taxas de entrega para cada bairro de Canindé. Altere os valores no lápis ou ative/desative a entrega usando a chave verde!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -48,27 +56,36 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
 
   void _abrirEditorDeTaxa(Map<String, dynamic> bairro) {
     final editarTaxaCtrl = TextEditingController(text: (bairro['taxa'] ?? 0.0).toStringAsFixed(2));
-    const corTema = Color(0xFF4A0E4E);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Atualizar Taxa - ${bairro['bairro']}', style: const TextStyle(color: corTema, fontWeight: FontWeight.bold)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Atualizar Taxa - ${bairro['bairro']}', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900)),
         content: TextField(
           controller: editarTaxaCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
             labelText: 'Valor da Entrega (R\$)', 
-            border: OutlineInputBorder(),
+            labelStyle: TextStyle(color: textSecColor),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
+            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentColor, width: 2), borderRadius: BorderRadius.circular(10)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context), 
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey))
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+            ),
             onPressed: () async {
               if (editarTaxaCtrl.text.isNotEmpty) {
                 final double novaTaxa = double.tryParse(editarTaxaCtrl.text.replaceAll(',', '.')) ?? 0.0;
@@ -82,7 +99,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                 }
               }
             },
-            child: const Text('Salvar Nova Taxa', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('Salvar Nova Taxa', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -108,17 +125,16 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
   }
 
   Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
-    const corTema = Color(0xFF4A0E4E);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -129,12 +145,12 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -142,7 +158,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -157,11 +173,11 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -175,7 +191,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
             )
@@ -185,7 +201,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -198,9 +214,9 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -212,18 +228,18 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Aqui você gerencia todos os valores de entrega da loja para a cidade.\n\n"
                           "Quer fazer um Tour Guiado rápido para ver como ajustar?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -235,7 +251,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -247,20 +263,20 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -275,14 +291,71 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
 
   @override
   Widget build(BuildContext context) {
-    const corTema = Color(0xFF4A0E4E);
-
     return ShowCaseWidget(
       onStart: (index, key) => _playAudioForStep(index),
       onComplete: (index, key) => _flutterTts.stop(),
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: cardColor,
+            elevation: 0,
+            leading: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(Icons.menu, color: textColor),
+                  onPressed: () {
+                    context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                  },
+                  tooltip: 'Abrir Menu Lateral',
+                );
+              },
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'CONFIGURAÇÃO DE FRETE', 
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: accentColor.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.local_shipping, color: accentColor, size: 16),
+                    const SizedBox(width: 8),
+                    Text('${_bairros.length} BAIRROS', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ],
+                ),
+              )
+            ],
+          ),
           body: Stack(
             children: [
               Padding(
@@ -291,21 +364,26 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: const Padding(
-                        padding: EdgeInsets.all(16.0),
+                      color: cardColor,
+                      elevation: isDark ? 4 : 2,
+                      shadowColor: Colors.black.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
                         child: Row(
                           children: [
-                            Icon(Icons.map, color: corTema, size: 32),
-                            SizedBox(width: 16),
+                            Icon(Icons.map, color: accentColor, size: 32),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Controle de Praças de Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: corTema)),
-                                  SizedBox(height: 4),
-                                  Text('Sede Operacional: Canindé / CE', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                  Text('Controle de Praças de Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: accentColor)),
+                                  const SizedBox(height: 4),
+                                  Text('Sede Operacional: Canindé / CE', style: TextStyle(color: textSecColor, fontSize: 13)),
                                 ],
                               ),
                             ),
@@ -314,63 +392,87 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    const Text('Tabela de Taxas de Frete no Banco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: corTema)),
+                    Text('Tabela de Taxas de Frete no Banco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
                     const SizedBox(height: 12),
                     Expanded(
                       child: _carregando
-                          ? const Center(child: CircularProgressIndicator(color: corTema))
+                          ? Center(child: CircularProgressIndicator(color: accentColor))
                           : _bairros.isEmpty
-                              ? const Center(child: Text('Nenhum bairro encontrado no banco de dados.'))
+                              ? Center(child: Text('Nenhum bairro encontrado no banco de dados.', style: TextStyle(color: textSecColor)))
                               : Showcase.withWidget(
                                   key: _keyLista,
                                   container: _buildTooltipMascote(showcaseContext, _textosMascote[0], true),
-                                  child: ListView.separated(
-                                    itemCount: _bairros.length,
-                                    separatorBuilder: (_, __) => const Divider(),
-                                    itemBuilder: (context, index) {
-                                      final bairro = _bairros[index];
-                                      final double taxa = bairro['taxa'] != null ? double.tryParse(bairro['taxa'].toString()) ?? 0.0 : 0.0;
-                                      final bool ativo = bairro['ativo'] ?? true;
+                                  child: Card(
+                                    color: cardColor,
+                                    elevation: isDark ? 4 : 2,
+                                    shadowColor: Colors.black.withOpacity(0.1),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                                    ),
+                                    child: ListView.separated(
+                                      itemCount: _bairros.length,
+                                      separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
+                                      itemBuilder: (context, index) {
+                                        final bairro = _bairros[index];
+                                        final double taxa = bairro['taxa'] != null ? double.tryParse(bairro['taxa'].toString()) ?? 0.0 : 0.0;
+                                        final bool ativo = bairro['ativo'] ?? true;
 
-                                      return ListTile(
-                                        leading: Icon(
-                                          Icons.delivery_dining, 
-                                          color: ativo ? Colors.indigo : Colors.grey,
-                                        ),
-                                        title: Text(
-                                          bairro['bairro'] ?? '', 
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: ativo ? Colors.black : Colors.grey,
-                                            decoration: ativo ? null : TextDecoration.lineThrough,
-                                          )
-                                        ),
-                                        subtitle: Text(
-                                          ativo ? 'Taxa: R\$ ${taxa.toStringAsFixed(2)}' : 'Entrega Desativada para este Bairro',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold, 
-                                            color: ativo ? corTema : Colors.red,
-                                          ),
-                                        ),
-                                        trailing: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (ativo)
-                                              IconButton(
-                                                icon: const Icon(Icons.edit, color: corTema),
-                                                onPressed: () => _abrirEditorDeTaxa(bairro),
-                                              ),
-                                            const SizedBox(width: 8),
-                                            Switch(
-                                              value: ativo,
-                                              activeColor: Colors.green,
-                                              inactiveThumbColor: Colors.red,
-                                              onChanged: (valor) => _alternarAtivacaoBairro(bairro, valor),
+                                        return ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                          leading: Container(
+                                            width: 48, height: 48,
+                                            decoration: BoxDecoration(
+                                              color: (ativo ? Colors.indigo : Colors.grey).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(12)
                                             ),
-                                          ],
-                                        ),
-                                      );
-                                    },
+                                            child: Icon(
+                                              Icons.delivery_dining, 
+                                              color: ativo ? Colors.indigoAccent : Colors.grey,
+                                            ),
+                                          ),
+                                          title: Text(
+                                            bairro['bairro'] ?? '', 
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: ativo ? textColor : textSecColor,
+                                              decoration: ativo ? null : TextDecoration.lineThrough,
+                                            )
+                                          ),
+                                          subtitle: Padding(
+                                            padding: const EdgeInsets.only(top: 6.0),
+                                            child: Text(
+                                              ativo ? 'Taxa: R\$ ${taxa.toStringAsFixed(2).replaceAll('.', ',')}' : 'Entrega Desativada para este Bairro',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold, 
+                                                fontSize: 13,
+                                                color: ativo ? accentColor : Colors.redAccent,
+                                              ),
+                                            ),
+                                          ),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (ativo)
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                                  tooltip: 'Editar Taxa',
+                                                  onPressed: () => _abrirEditorDeTaxa(bairro),
+                                                ),
+                                              const SizedBox(width: 8),
+                                              Switch(
+                                                value: ativo,
+                                                activeColor: Colors.green,
+                                                inactiveThumbColor: Colors.redAccent,
+                                                inactiveTrackColor: Colors.redAccent.withOpacity(0.3),
+                                                onChanged: (valor) => _alternarAtivacaoBairro(bairro, valor),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                     ),
@@ -381,13 +483,13 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                 bottom: 24,
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
+                          color: accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
@@ -403,7 +505,7 @@ class _CadastroFretePageState extends State<CadastroFretePage> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),

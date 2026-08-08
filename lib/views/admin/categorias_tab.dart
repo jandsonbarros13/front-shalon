@@ -14,6 +14,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
   final _categoriaService = CategoriaService();
   List<dynamic> _categorias = [];
   bool _isLoading = true;
+  bool _isDarkMode = true; 
 
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyLista = GlobalKey();
@@ -21,8 +22,15 @@ class _CategoriasTabState extends State<CategoriasTab> {
 
   final List<String> _textosMascote = [
     "Aqui você gerencia todas as categorias do seu cardápio, como Açaí, Bebidas e Adicionais. Você pode editar ou excluir clicando nos ícones ao lado.",
-    "E para criar uma nova categoria, é só clicar neste botão amarelo de Nova Categoria!"
+    "E para criar uma nova categoria, é só clicar neste botão de Nova Categoria!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -57,17 +65,16 @@ class _CategoriasTabState extends State<CategoriasTab> {
   }
 
   Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
-    const corTema = Color(0xFF4A0E4E);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -78,12 +85,12 @@ class _CategoriasTabState extends State<CategoriasTab> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -91,7 +98,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -106,11 +113,11 @@ class _CategoriasTabState extends State<CategoriasTab> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -124,17 +131,17 @@ class _CategoriasTabState extends State<CategoriasTab> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -147,9 +154,9 @@ class _CategoriasTabState extends State<CategoriasTab> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -161,18 +168,18 @@ class _CategoriasTabState extends State<CategoriasTab> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Esta é a tela de Categorias. Aqui você organiza seu cardápio criando seções como 'Açaí', 'Bebidas' ou 'Adicionais'.\n\n"
                           "Quer fazer um Tour Guiado para ver como funciona?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -184,7 +191,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -197,20 +204,20 @@ class _CategoriasTabState extends State<CategoriasTab> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -230,17 +237,23 @@ class _CategoriasTabState extends State<CategoriasTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           isEdicao ? 'Editar Categoria' : 'Nova Categoria',
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A0E4E)),
+          style: TextStyle(fontWeight: FontWeight.w900, color: accentColor),
         ),
         content: TextField(
           controller: nomeController,
-          decoration: const InputDecoration(
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
             labelText: 'Nome da Categoria',
             hintText: 'Ex: Sobremesas',
-            border: OutlineInputBorder(),
+            labelStyle: TextStyle(color: textSecColor),
+            hintStyle: TextStyle(color: textSecColor.withOpacity(0.5)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
+            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentColor, width: 2), borderRadius: BorderRadius.circular(10)),
           ),
           autofocus: true,
           textCapitalization: TextCapitalization.words,
@@ -248,10 +261,14 @@ class _CategoriasTabState extends State<CategoriasTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor, 
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+            ),
             onPressed: () async {
               if (nomeController.text.trim().isEmpty) return;
               
@@ -267,10 +284,10 @@ class _CategoriasTabState extends State<CategoriasTab> {
 
               if (sucesso) {
                 _carregarCategorias();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoria salva com sucesso!'), backgroundColor: Colors.green));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoria salva com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
               } else {
                 setState(() => _isLoading = false);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar categoria.'), backgroundColor: Colors.red));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar categoria.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
               }
             },
             child: const Text('Salvar', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -284,12 +301,18 @@ class _CategoriasTabState extends State<CategoriasTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Excluir Categoria?'),
-        content: Text('Tem certeza que deseja remover a categoria "$nome"?'),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir Categoria?', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+        content: Text('Tem certeza que deseja remover a categoria "$nome"?', style: TextStyle(color: textColor)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent, 
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+            ),
             onPressed: () async {
               Navigator.pop(context);
               setState(() => _isLoading = true);
@@ -298,7 +321,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                 _carregarCategorias();
               } else {
                 setState(() => _isLoading = false);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao excluir categoria.'), backgroundColor: Colors.red));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao excluir categoria.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
               }
             },
             child: const Text('Excluir', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -310,60 +333,135 @@ class _CategoriasTabState extends State<CategoriasTab> {
 
   @override
   Widget build(BuildContext context) {
-    const corTema = Color(0xFF4A0E4E);
-
     return ShowCaseWidget(
       onStart: (index, key) => _playAudioForStep(index),
       onComplete: (index, key) => _flutterTts.stop(),
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: Colors.grey[100],
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: cardColor,
+            elevation: 0,
+            leading: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(Icons.menu, color: textColor),
+                  onPressed: () {
+                    context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                  },
+                  tooltip: 'Abrir Menu Lateral',
+                );
+              },
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'CONTROLE DE TIPOS / CATEGORIAS', 
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: accentColor.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.category, color: accentColor, size: 16),
+                    const SizedBox(width: 8),
+                    Text('${_categorias.length} CADASTRADAS', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ],
+                ),
+              )
+            ],
+          ),
           floatingActionButton: Showcase.withWidget(
             key: _keyNovo,
             container: _buildTooltipMascote(showcaseContext, _textosMascote[1], true),
             child: FloatingActionButton.extended(
               backgroundColor: const Color(0xFFFFD700),
               foregroundColor: Colors.black,
-              icon: const Icon(Icons.add),
-              label: const Text('Nova Categoria', style: TextStyle(fontWeight: FontWeight.bold)),
+              elevation: 4,
+              icon: const Icon(Icons.add, size: 24),
+              label: const Text('Nova Categoria', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
               onPressed: () => _abrirModalCategoria(),
             ),
           ),
           body: Stack(
             children: [
               _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: corTema))
+                  ? Center(child: CircularProgressIndicator(color: accentColor))
                   : Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Gerenciamento de Tipos / Categorias', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: corTema)),
+                          Text('Gerenciamento de Tipos / Categorias', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor)),
                           const SizedBox(height: 8),
-                          const Text('Crie ou edite as categorias que aparecerão no catálogo e nos filtros.', style: TextStyle(color: Colors.grey)),
-                          const SizedBox(height: 24),
+                          Text('Crie ou edite as categorias que aparecerão no catálogo e nos filtros de pesquisa.', style: TextStyle(color: textSecColor, fontSize: 15)),
+                          const SizedBox(height: 30),
                           Expanded(
                             child: _categorias.isEmpty
-                                ? const Center(child: Text('Nenhuma categoria cadastrada.'))
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.category_outlined, size: 64, color: textSecColor.withOpacity(0.5)),
+                                        const SizedBox(height: 16),
+                                        Text('Nenhuma categoria cadastrada.', style: TextStyle(color: textSecColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  )
                                 : Showcase.withWidget(
                                     key: _keyLista,
                                     container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
                                     child: Card(
-                                      elevation: 2,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      color: cardColor,
+                                      elevation: 4,
+                                      shadowColor: Colors.black.withOpacity(0.1),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                                      ),
                                       child: ListView.separated(
                                         itemCount: _categorias.length,
-                                        separatorBuilder: (context, index) => const Divider(height: 1),
+                                        separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
                                         itemBuilder: (context, index) {
                                           final cat = _categorias[index];
                                           return ListTile(
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                                            leading: CircleAvatar(
-                                              backgroundColor: corTema.withOpacity(0.1),
-                                              child: const Icon(Icons.category, color: corTema),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                            leading: Container(
+                                              width: 48, height: 48,
+                                              decoration: BoxDecoration(
+                                                color: accentColor.withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(12)
+                                              ),
+                                              child: Icon(Icons.category, color: accentColor),
                                             ),
-                                            title: Text(cat['nome'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                            title: Text(cat['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
                                             trailing: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
@@ -372,8 +470,9 @@ class _CategoriasTabState extends State<CategoriasTab> {
                                                   tooltip: 'Editar',
                                                   onPressed: () => _abrirModalCategoria(categoria: cat),
                                                 ),
+                                                const SizedBox(width: 8),
                                                 IconButton(
-                                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
                                                   tooltip: 'Excluir',
                                                   onPressed: () => _confirmarExclusao(cat['id'], cat['nome']),
                                                 ),
@@ -389,18 +488,17 @@ class _CategoriasTabState extends State<CategoriasTab> {
                       ),
                     ),
 
-              // Botão do Mascote Flutuante
               Positioned(
-                bottom: 100, // Posicionado acima do botão "Nova Categoria"
+                bottom: 100, 
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
+                          color: accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
@@ -416,7 +514,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),

@@ -25,6 +25,7 @@ class _PedidosTabState extends State<PedidosTab> {
   int _totalPedidos = 0;
   bool _isLoading = true;
   Timer? _timerAutoRefresh;
+  bool _isDarkMode = true; 
 
   int _paginaAtual = 1;
   final int _itensPorPagina = 10;
@@ -37,6 +38,13 @@ class _PedidosTabState extends State<PedidosTab> {
     "Bem-vindo à Fila de Pedidos! Aqui você pode pesquisar rapidamente pelo ID ou nome do cliente.",
     "Nesta lista ficam todos os pedidos recentes. Clique no ícone de olho para abrir os detalhes, alterar o status e até chamar o cliente no WhatsApp!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -114,7 +122,7 @@ class _PedidosTabState extends State<PedidosTab> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Número de telefone do cliente é inválido.'), backgroundColor: Colors.orange),
+          const SnackBar(content: Text('Número de telefone do cliente é inválido.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.orange),
         );
       }
     }
@@ -224,16 +232,17 @@ class _PedidosTabState extends State<PedidosTab> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(tituloModal, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(mensagemModal),
+        title: Text(tituloModal, style: TextStyle(fontWeight: FontWeight.bold, color: corBotao)),
+        content: Text(mensagemModal, style: TextStyle(color: textColor)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: corBotao, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: corBotao, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               Navigator.pop(dialogContext); 
               setState(() => _isLoading = true); 
@@ -247,7 +256,7 @@ class _PedidosTabState extends State<PedidosTab> {
                 setState(() => _isLoading = false);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erro ao atualizar status do pedido.'), backgroundColor: Colors.red),
+                    const SnackBar(content: Text('Erro ao atualizar status do pedido.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent),
                   );
                 }
               }
@@ -266,7 +275,6 @@ class _PedidosTabState extends State<PedidosTab> {
 
   void _mostrarModalDetalhes(Map<String, dynamic> p) {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
-    final corTema = const Color(0xFF4A0E4E);
     final itens = p['itens'] as List? ?? [];
     final double valorTotal = double.tryParse(p['valor_total'].toString()) ?? 0.0;
     final String status = p['status'] ?? 'Pendente';
@@ -275,6 +283,7 @@ class _PedidosTabState extends State<PedidosTab> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         insetPadding: EdgeInsets.all(isMobile ? 16 : 40),
         child: Container(
@@ -285,7 +294,7 @@ class _PedidosTabState extends State<PedidosTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: BoxDecoration(
-                  color: corTema,
+                  color: accentColor,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Row(
@@ -311,7 +320,7 @@ class _PedidosTabState extends State<PedidosTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('INFORMAÇÕES DO CLIENTE', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey)),
+                            Text('INFORMAÇÕES DO CLIENTE', style: TextStyle(fontWeight: FontWeight.w900, color: textSecColor)),
                             const SizedBox(height: 12),
                             _linhaDetalhe(Icons.person, p['cliente_nome'] ?? 'Cliente'),
                             const SizedBox(height: 8),
@@ -329,7 +338,7 @@ class _PedidosTabState extends State<PedidosTab> {
                                 ),
                             ],
                             const SizedBox(height: 24),
-                            const Text('PAGAMENTO', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey)),
+                            Text('PAGAMENTO', style: TextStyle(fontWeight: FontWeight.w900, color: textSecColor)),
                             const SizedBox(height: 12),
                             _linhaDetalhe(Icons.payment, p['forma_pagamento'] ?? ''),
                             if (p['forma_pagamento'] == 'Dinheiro' && (p['troco_para'] != null && p['troco_para'] > 0))
@@ -341,15 +350,15 @@ class _PedidosTabState extends State<PedidosTab> {
                         ),
                       ),
                       if (!isMobile)
-                        Container(width: 1, height: 250, color: Colors.grey[300], margin: const EdgeInsets.symmetric(horizontal: 24)),
+                        Container(width: 1, height: 250, color: isDark ? Colors.white10 : Colors.grey[300], margin: const EdgeInsets.symmetric(horizontal: 24)),
                       if (isMobile)
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
+                        Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Divider(color: isDark ? Colors.white10 : Colors.grey[300])),
                       Expanded(
                         flex: isMobile ? 0 : 1,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ITENS DO PEDIDO', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey)),
+                            Text('ITENS DO PEDIDO', style: TextStyle(fontWeight: FontWeight.w900, color: textSecColor)),
                             const SizedBox(height: 12),
                             ...itens.map((item) {
                               String un = (item['unidade'] ?? '').toString().toLowerCase();
@@ -364,23 +373,23 @@ class _PedidosTabState extends State<PedidosTab> {
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
-                                      child: Text(qtdTexto, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      decoration: BoxDecoration(color: isDark ? const Color(0xFF1A1A24) : Colors.grey[200], borderRadius: BorderRadius.circular(4)),
+                                      child: Text(qtdTexto, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
                                     ),
                                     const SizedBox(width: 8),
-                                    Expanded(child: Text('${item['nome']}', style: const TextStyle(fontSize: 15))),
+                                    Expanded(child: Text('${item['nome']}', style: TextStyle(fontSize: 15, color: textColor))),
                                   ],
                                 ),
                               );
                             }),
                             const SizedBox(height: 16),
-                            const Divider(),
+                            Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                             const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('TOTAL DO PEDIDO', style: TextStyle(fontWeight: FontWeight.bold)),
-                                Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: corTema)),
+                                Text('TOTAL DO PEDIDO', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: accentColor)),
                               ],
                             ),
                           ],
@@ -393,8 +402,8 @@ class _PedidosTabState extends State<PedidosTab> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                  color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[50],
+                  border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!)),
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
                 ),
                 child: Wrap(
@@ -407,8 +416,8 @@ class _PedidosTabState extends State<PedidosTab> {
                         id: p['id'], novoStatus: 'Preparando', tituloModal: 'Aceitar Pedido', mensagemModal: 'Deseja aceitar e iniciar o preparo do pedido #${p['id']}?', corBotao: Colors.blue, 
                         onSuccess: () => _abrirWhatsApp(p['cliente_telefone'] ?? '', 'Olá ${p['cliente_nome']}! Seu pedido #${p['id']} foi aceito pela Açaiteria Shalom e já está sendo preparado.')
                       ))),
-                      _btnAcao('Cancelar Pedido', Icons.cancel, Colors.red, () => _acaoComModalDetalhe(p, () => _confirmarMudarStatus(
-                        id: p['id'], novoStatus: 'Cancelado', tituloModal: 'Cancelar Pedido', mensagemModal: 'Tem certeza de que deseja cancelar o pedido #${p['id']}?', corBotao: Colors.red, 
+                      _btnAcao('Cancelar Pedido', Icons.cancel, Colors.redAccent, () => _acaoComModalDetalhe(p, () => _confirmarMudarStatus(
+                        id: p['id'], novoStatus: 'Cancelado', tituloModal: 'Cancelar Pedido', mensagemModal: 'Tem certeza de que deseja cancelar o pedido #${p['id']}?', corBotao: Colors.redAccent, 
                         onSuccess: () => _abrirWhatsApp(p['cliente_telefone'] ?? '', 'Olá ${p['cliente_nome']}. Infelizmente seu pedido #${p['id']} precisou ser cancelado.')
                       ))),
                     ],
@@ -444,14 +453,25 @@ class _PedidosTabState extends State<PedidosTab> {
     );
   }
 
+  Widget _linhaDetalhe(IconData icon, String texto) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: accentColor),
+        const SizedBox(width: 8),
+        Expanded(child: Text(texto, style: TextStyle(fontSize: 14, color: textColor))),
+      ],
+    );
+  }
+
   Color _getCorStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pendente': return Colors.orange;
       case 'preparando': return Colors.blue;
       case 'saiu para entrega': return Colors.purple;
       case 'pronto para retirada': return Colors.teal;
-      case 'concluído': return Colors.green;
-      case 'cancelado': return Colors.red;
+      case 'concluído': return Colors.greenAccent[700] ?? Colors.green;
+      case 'cancelado': return Colors.redAccent;
       default: return Colors.grey;
     }
   }
@@ -465,17 +485,16 @@ class _PedidosTabState extends State<PedidosTab> {
   }
 
   Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
-    const corTema = Color(0xFF4A0E4E);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -486,12 +505,12 @@ class _PedidosTabState extends State<PedidosTab> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -499,7 +518,7 @@ class _PedidosTabState extends State<PedidosTab> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -514,11 +533,11 @@ class _PedidosTabState extends State<PedidosTab> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -532,10 +551,10 @@ class _PedidosTabState extends State<PedidosTab> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -555,7 +574,7 @@ class _PedidosTabState extends State<PedidosTab> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: corTema, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
@@ -575,12 +594,12 @@ class _PedidosTabState extends State<PedidosTab> {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Aqui você gerencia todos os pedidos dos clientes. Pode alterar os status, ver detalhes e chamar no WhatsApp!\n\n"
                           "Quer que eu te mostre como funciona rapidinho?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -605,20 +624,20 @@ class _PedidosTabState extends State<PedidosTab> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -633,7 +652,6 @@ class _PedidosTabState extends State<PedidosTab> {
 
   @override
   Widget build(BuildContext context) {
-    final corTema = const Color(0xFF4A0E4E);
     final larguraTela = MediaQuery.of(context).size.width;
     final isMobile = larguraTela < 600;
 
@@ -646,15 +664,49 @@ class _PedidosTabState extends State<PedidosTab> {
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F8),
+          backgroundColor: bgColor,
           appBar: AppBar(
-            title: const Text('Fila de Pedidos', style: TextStyle(fontWeight: FontWeight.w900)),
-            backgroundColor: Colors.white,
-            foregroundColor: corTema,
-            elevation: 1,
+            backgroundColor: cardColor,
+            elevation: 0,
+            leading: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(Icons.menu, color: textColor),
+                  onPressed: () {
+                    context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                  },
+                  tooltip: 'Abrir Menu Lateral',
+                );
+              },
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'FILA DE PEDIDOS', 
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+              IconButton(
+                icon: Icon(Icons.refresh, color: textColor),
                 tooltip: 'Atualizar Lista',
                 onPressed: () => _carregarPedidos(),
               ),
@@ -667,43 +719,28 @@ class _PedidosTabState extends State<PedidosTab> {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    color: Colors.white,
+                    color: cardColor,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 50, height: 50,
-                              decoration: const BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover)),
-                            ),
-                            const SizedBox(width: 12),
-                            const Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF4A0E4E))),
-                                Text('Gestão de Pedidos', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
                         Showcase.withWidget(
                           key: _keyBusca,
                           container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
                           child: TextField(
                             controller: _buscaController,
                             onChanged: _filtrarPedidos,
+                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                             decoration: InputDecoration(
                               hintText: 'Pesquisar por ID da Venda ou Nome do Cliente...',
-                              prefixIcon: const Icon(Icons.search, color: Color(0xFF4A0E4E)),
+                              hintStyle: TextStyle(color: textSecColor),
+                              prefixIcon: Icon(Icons.search, color: accentColor),
                               filled: true,
-                              fillColor: const Color(0xFFF4F6F8),
+                              fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
                             ),
                           ),
                         ),
@@ -712,17 +749,17 @@ class _PedidosTabState extends State<PedidosTab> {
                   ),
                   Expanded(
                     child: _isLoading
-                        ? Center(child: CircularProgressIndicator(color: corTema))
+                        ? Center(child: CircularProgressIndicator(color: accentColor))
                         : _pedidosFiltrados.isEmpty
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
+                                    Icon(Icons.inbox_outlined, size: 80, color: textSecColor.withOpacity(0.5)),
                                     const SizedBox(height: 16),
-                                    Text('Nenhum pedido no momento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey[600]), textAlign: TextAlign.center),
+                                    Text('Nenhum pedido no momento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textSecColor), textAlign: TextAlign.center),
                                     const SizedBox(height: 8),
-                                    Text('Aguardando os clientes fazerem pedidos na vitrine...', style: TextStyle(color: Colors.grey[500]), textAlign: TextAlign.center),
+                                    Text('Aguardando os clientes fazerem pedidos na vitrine...', style: TextStyle(color: textSecColor), textAlign: TextAlign.center),
                                   ],
                                 ),
                               )
@@ -738,11 +775,13 @@ class _PedidosTabState extends State<PedidosTab> {
                                         final String status = p['status'] ?? 'Pendente';
 
                                         Widget cardContent = Card(
-                                          elevation: 2,
+                                          color: cardColor,
+                                          elevation: isDark ? 4 : 2,
+                                          shadowColor: Colors.black.withOpacity(0.1),
                                           margin: const EdgeInsets.only(bottom: 12),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(12),
-                                            side: BorderSide(color: _getCorStatus(status).withOpacity(0.3), width: 1),
+                                            side: BorderSide(color: isDark ? Colors.white10 : _getCorStatus(status).withOpacity(0.3), width: 1),
                                           ),
                                           child: Padding(
                                             padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: isMobile ? 8.0 : 16.0),
@@ -754,14 +793,14 @@ class _PedidosTabState extends State<PedidosTab> {
                                                   child: Text('#${p['id']}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _getCorStatus(status))),
                                                 ),
                                               ),
-                                              title: Text(p['cliente_nome'] ?? 'Cliente', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              title: Text(p['cliente_nome'] ?? 'Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
                                               subtitle: Padding(
                                                 padding: const EdgeInsets.only(top: 4.0),
                                                 child: Row(
                                                   children: [
-                                                    Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                                                    Icon(Icons.access_time, size: 14, color: textSecColor),
                                                     const SizedBox(width: 4),
-                                                    Text('${p['data']}', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                                                    Text('${p['data']}', style: TextStyle(color: textSecColor, fontSize: 13)),
                                                     const SizedBox(width: 12),
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -777,12 +816,12 @@ class _PedidosTabState extends State<PedidosTab> {
                                                   if (!isMobile)
                                                     Padding(
                                                       padding: const EdgeInsets.only(right: 16.0),
-                                                      child: Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
+                                                      child: Text('R\$ ${valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: accentColor)),
                                                     ),
                                                   Container(
-                                                    decoration: BoxDecoration(color: corTema.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                                    decoration: BoxDecoration(color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                                                     child: IconButton(
-                                                      icon: Icon(Icons.visibility, color: corTema),
+                                                      icon: Icon(Icons.visibility, color: accentColor),
                                                       tooltip: 'Ver Detalhes do Pedido',
                                                       onPressed: () => _mostrarModalDetalhes(p),
                                                     ),
@@ -804,7 +843,7 @@ class _PedidosTabState extends State<PedidosTab> {
                                       },
                                     ),
                                   ),
-                                  _buildControlePaginacao(totalPaginas, corTema),
+                                  _buildControlePaginacao(totalPaginas, accentColor, cardColor, textColor, textSecColor, isDark),
                                 ],
                               ),
                   ),
@@ -814,13 +853,13 @@ class _PedidosTabState extends State<PedidosTab> {
                 bottom: 24,
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext, accentColor),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
+                          color: accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
@@ -836,7 +875,7 @@ class _PedidosTabState extends State<PedidosTab> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),
@@ -848,17 +887,6 @@ class _PedidosTabState extends State<PedidosTab> {
           ),
         );
       }
-    );
-  }
-
-  Widget _linhaDetalhe(IconData icon, String texto) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: Colors.grey[600]),
-        const SizedBox(width: 8),
-        Expanded(child: Text(texto, style: const TextStyle(fontSize: 14))),
-      ],
     );
   }
 
@@ -877,21 +905,22 @@ class _PedidosTabState extends State<PedidosTab> {
     );
   }
 
-  Widget _buildControlePaginacao(int totalPaginas, Color corTema) {
+  Widget _buildControlePaginacao(int totalPaginas, Color accentColor, Color cardColor, Color textColor, Color textSecColor, bool isDark) {
     if (totalPaginas <= 1) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, -2))]
+        color: cardColor,
+        border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 4, offset: const Offset(0, -2))]
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back_ios, size: 20),
-            color: _paginaAtual > 1 ? corTema : Colors.grey[300],
+            color: _paginaAtual > 1 ? accentColor : textSecColor.withOpacity(0.3),
             onPressed: _paginaAtual > 1 ? () {
               setState(() => _paginaAtual--);
               _carregarPedidos();
@@ -900,12 +929,12 @@ class _PedidosTabState extends State<PedidosTab> {
           const SizedBox(width: 16),
           Text(
             'Página $_paginaAtual de $totalPaginas',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800], fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14),
           ),
           const SizedBox(width: 16),
           IconButton(
             icon: const Icon(Icons.arrow_forward_ios, size: 20),
-            color: _paginaAtual < totalPaginas ? corTema : Colors.grey[300],
+            color: _paginaAtual < totalPaginas ? accentColor : textSecColor.withOpacity(0.3),
             onPressed: _paginaAtual < totalPaginas ? () {
               setState(() => _paginaAtual++);
               _carregarPedidos();

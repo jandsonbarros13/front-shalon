@@ -28,6 +28,7 @@ class _AdminScreenState extends State<AdminScreen> {
   Timer? _timerGlobal;
   int _ultimoPedidoConhecido = 0;
   bool _isInitialLoad = true;
+  bool _isDarkMode = true; 
 
   final List<String> _titulos = [
     'Dashboard Shalom',
@@ -141,26 +142,31 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _mostrarNotificacaoVisual() {
     if (mounted) {
+      final cardColor = _isDarkMode ? const Color(0xFF27293D) : Colors.white;
+      final textColor = _isDarkMode ? Colors.white : const Color(0xFF333333);
+      final accentColor = _isDarkMode ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.notification_important, color: Colors.amber, size: 28),
-              SizedBox(width: 8),
-              Text('Novo Pedido Chegou!', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Icon(Icons.notification_important, color: Colors.amber, size: 28),
+              const SizedBox(width: 8),
+              Text('Novo Pedido Chegou!', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             ],
           ),
-          content: const Text('Um cliente acabou de enviar um pedido novo. Deseja ir para a tela de Pedidos agora?'),
+          content: Text('Um cliente acabou de enviar um pedido novo. Deseja ir para a tela de Pedidos agora?', style: TextStyle(color: textColor.withOpacity(0.8))),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Ficar Aqui', style: TextStyle(color: Colors.grey)),
+              child: Text('Ficar Aqui', style: TextStyle(color: textColor.withOpacity(0.6))),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A0E4E), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
                 setState(() => _abaSelecionada = 5);
@@ -175,25 +181,30 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _mostrarNotificacaoPendentes(int quantidade) {
     if (mounted) {
+      final cardColor = _isDarkMode ? const Color(0xFF27293D) : Colors.white;
+      final textColor = _isDarkMode ? Colors.white : const Color(0xFF333333);
+      final accentColor = _isDarkMode ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue, size: 28),
-              SizedBox(width: 8),
-              Text('Pedidos em Aberto', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Icon(Icons.info_outline, color: Colors.blue, size: 28),
+              const SizedBox(width: 8),
+              Text('Pedidos em Aberto', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             ],
           ),
-          content: Text('Você tem $quantidade pedido(s) pendente(s) aguardando preparo na fila.'),
+          content: Text('Você tem $quantidade pedido(s) pendente(s) aguardando preparo na fila.', style: TextStyle(color: textColor.withOpacity(0.8))),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Fechar', style: TextStyle(color: Colors.grey)),
+              child: Text('Fechar', style: TextStyle(color: textColor.withOpacity(0.6))),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
                 setState(() => _abaSelecionada = 5);
@@ -206,14 +217,15 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  Widget _buildItemMenu(IconData icone, String titulo, int indice) {
+  Widget _buildItemMenu(IconData icone, String titulo, int indice, Color accentColor, Color textColor) {
+    bool isSelected = _abaSelecionada == indice;
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
-      leading: Icon(icone, color: const Color(0xFF4A0E4E), size: 22),
-      title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-      selected: _abaSelecionada == indice,
-      selectedTileColor: const Color(0xFFFFD700).withOpacity(0.15),
+      leading: Icon(icone, color: isSelected ? accentColor : textColor.withOpacity(0.6), size: 22),
+      title: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? accentColor : textColor)),
+      selected: isSelected,
+      selectedTileColor: accentColor.withOpacity(0.15),
       onTap: () {
         setState(() => _abaSelecionada = indice);
         Navigator.pop(context);
@@ -223,70 +235,104 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const corTema = Color(0xFF4A0E4E);
+    final bgColor = _isDarkMode ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+    final cardColor = _isDarkMode ? const Color(0xFF27293D) : Colors.white;
+    final textColor = _isDarkMode ? Colors.white : const Color(0xFF333333);
+    final accentColor = _isDarkMode ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_titulos[_abaSelecionada], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: corTema,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      drawer: Drawer(
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: corTema),
-              margin: EdgeInsets.zero,
-              currentAccountPicture: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/logo.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              accountName: const Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              accountEmail: const Text('Painel Administrativo', style: TextStyle(color: Colors.white70, fontSize: 12)),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                children: [
-                  _buildItemMenu(Icons.dashboard, 'Dashboard', 0),
-                  _buildItemMenu(Icons.point_of_sale, 'Vendas (PDV)', 1),
-                  _buildItemMenu(Icons.history_toggle_off, 'Minhas Vendas', 2),
-                  _buildItemMenu(Icons.category, 'Categorias / Tipos', 3),
-                  _buildItemMenu(Icons.icecream_outlined, 'Produtos', 4),
-                  _buildItemMenu(Icons.list_alt, 'Pedidos', 5),
-                  _buildItemMenu(Icons.auto_stories, 'Catálogo', 6),
-                  _buildItemMenu(Icons.people, 'Usuários', 7),
-                  _buildItemMenu(Icons.local_shipping, 'Configurar Frete', 8),
-                  _buildItemMenu(Icons.business, 'Empresa', 9),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.logout, color: Colors.red, size: 22),
-              title: const Text('Sair do Painel', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+    return Theme(
+      data: _isDarkMode ? ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: bgColor,
+        cardColor: cardColor,
+        colorScheme: ColorScheme.dark(
+          primary: accentColor,
+          surface: cardColor,
+          background: bgColor,
+        ),
+      ) : ThemeData.light().copyWith(
+        scaffoldBackgroundColor: bgColor,
+        cardColor: cardColor,
+        colorScheme: ColorScheme.light(
+          primary: accentColor,
+          surface: cardColor,
+          background: bgColor,
         ),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: _abas[_abaSelecionada],
+      child: Scaffold(
+        backgroundColor: bgColor,
+        appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].contains(_abaSelecionada)
+            ? null 
+            : AppBar(
+                title: Text(_titulos[_abaSelecionada], style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                backgroundColor: cardColor,
+                centerTitle: true,
+                elevation: 1,
+                iconTheme: IconThemeData(color: textColor),
+                actions: [
+                  IconButton(
+                    icon: Icon(_isDarkMode ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                    tooltip: 'Alternar Tema',
+                    onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+                  ),
+                ],
+              ),
+        drawer: Drawer(
+          backgroundColor: cardColor,
+          child: Column(
+            children: [
+              UserAccountsDrawerHeader(
+                decoration: BoxDecoration(color: cardColor),
+                margin: EdgeInsets.zero,
+                currentAccountPicture: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/logo.jpg'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                accountName: Text('Açaiteria Shalom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
+                accountEmail: Text('Painel Administrativo', style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 12)),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  children: [
+                    _buildItemMenu(Icons.dashboard, 'Dashboard', 0, accentColor, textColor),
+                    _buildItemMenu(Icons.point_of_sale, 'Vendas (PDV)', 1, accentColor, textColor),
+                    _buildItemMenu(Icons.history_toggle_off, 'Histórico de Vendas', 2, accentColor, textColor),
+                    _buildItemMenu(Icons.category, 'Controle de Tipos/Categorias', 3, accentColor, textColor),
+                    _buildItemMenu(Icons.icecream_outlined, 'Controle de Produtos', 4, accentColor, textColor),
+                    _buildItemMenu(Icons.list_alt, 'Pedidos da Loja', 5, accentColor, textColor),
+                    _buildItemMenu(Icons.auto_stories, 'Catálogo Digital', 6, accentColor, textColor),
+                    _buildItemMenu(Icons.people, 'Controle de Usuários', 7, accentColor, textColor),
+                    _buildItemMenu(Icons.local_shipping, 'Configuração de Frete', 8, accentColor, textColor),
+                    _buildItemMenu(Icons.business, 'Dados da Empresa', 9, accentColor, textColor),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: textColor.withOpacity(0.1)),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.logout, color: Colors.redAccent, size: 22),
+                title: const Text('Sair do Painel', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _abas[_abaSelecionada],
+        ),
       ),
     );
   }

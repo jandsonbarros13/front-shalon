@@ -36,6 +36,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
   
   bool _isLoadingEdit = true;
   bool _isSearching = false;
+  bool _isDarkMode = true;
   
   List<dynamic> _resultadosPesquisa = [];
   int? _produtoSelecionadoId; 
@@ -65,6 +66,13 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
   final List<String> _opcoesCorLetras = [
     '#FFFFFF', '#F1F3F5', '#000000', '#FFD700', 
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -99,7 +107,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     try {
       return Color(int.parse(hex.replaceFirst('#', '0xFF')));
     } catch (e) {
-      return const Color(0xFF4A0E4E);
+      return accentColor;
     }
   }
 
@@ -226,12 +234,12 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Falha ao subir capa pro servidor.'), backgroundColor: Colors.red)
+              const SnackBar(content: Text('Falha ao subir capa pro servidor.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent)
             );
           }
         }
       } catch (e) {
-        print("Erro ao processar a capa: $e");
+        debugPrint("Erro ao processar a capa: $e");
       } finally {
         setState(() => _isUploadingCapa = false); 
       }
@@ -273,10 +281,10 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     setState(() => _isSaving = false);
 
     if (resultado['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Catálogo salvo com sucesso!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Catálogo salvo com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: ${resultado['message']}'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: ${resultado['message']}', style: const TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
     }
   }
 
@@ -288,17 +296,17 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     }
   }
 
-  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast, Color corTema) {
+  Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast, Color corTemaDinamica) {
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: corTemaDinamica, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -309,12 +317,12 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: corTemaDinamica.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: corTemaDinamica),
                     ),
                   ),
                 ),
@@ -322,7 +330,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -337,11 +345,11 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: corTemaDinamica,
                     foregroundColor: _hexToColor(_corLetras),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -355,7 +363,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
             )
@@ -365,7 +373,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTemaDinamica) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -378,9 +386,9 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: corTemaDinamica, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -392,18 +400,18 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTemaDinamica),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
-                          "Aqui é onde a criatividade rola solta. Você pode personalizar as cores, a capa e escolher a dedo os produtos deste catálogo.\n\n"
+                          "Aqui é onde a mágica acontece. Você pode personalizar as cores, a capa e escolher a dedo os produtos deste catálogo.\n\n"
                           "Quer fazer um Tour Guiado rápido?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -415,7 +423,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: corTemaDinamica,
                           foregroundColor: _hexToColor(_corLetras),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -430,20 +438,20 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -507,12 +515,19 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F8),
+          backgroundColor: bgColor,
           appBar: AppBar(
             backgroundColor: corTemaDinamica,
             foregroundColor: corLetrasDinamica,
             title: Text(isEdit ? 'Editar Catálogo' : 'Novo Catálogo', style: const TextStyle(fontWeight: FontWeight.w900)),
             elevation: 0,
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: corLetrasDinamica),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+            ],
           ),
           body: Stack(
             children: [
@@ -526,10 +541,12 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                           constraints: const BoxConstraints(maxWidth: 900),
                           padding: const EdgeInsets.all(16.0),
                           child: Card(
-                            elevation: 0,
+                            color: cardColor,
+                            elevation: isDark ? 4 : 2,
+                            shadowColor: Colors.black.withOpacity(0.1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: corTemaDinamica.withOpacity(0.2)),
+                              side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(32.0),
@@ -550,9 +567,13 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                         children: [
                                           TextFormField(
                                             controller: _tituloController,
+                                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                                             decoration: InputDecoration(
                                               labelText: 'Título do Catálogo (Nome da Loja)',
-                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                              labelStyle: TextStyle(color: textSecColor),
+                                              filled: true,
+                                              fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                               focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
                                             ),
                                             validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
@@ -561,9 +582,13 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                           TextFormField(
                                             controller: _descricaoController,
                                             maxLines: 2,
+                                            style: TextStyle(color: textColor),
                                             decoration: InputDecoration(
                                               labelText: 'Descrição / Slogan',
-                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                              labelStyle: TextStyle(color: textSecColor),
+                                              filled: true,
+                                              fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                               focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica, width: 2), borderRadius: BorderRadius.circular(8)),
                                             ),
                                           ),
@@ -580,17 +605,17 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                           Container(
                                             padding: const EdgeInsets.all(24),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFF8F9FA),
+                                              color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF8F9FA),
                                               borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: Colors.grey[200]!),
+                                              border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
                                             ),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 _buildColorPicker('Escolha a Cor do Tema', _corTema, _opcoesCorTema, (hex) => setState(() => _corTema = hex)),
-                                                const Padding(
-                                                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                                                  child: Divider(),
+                                                Padding(
+                                                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                                                  child: Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                                                 ),
                                                 _buildColorPicker('Escolha a Cor das Letras (Botões e Títulos)', _corLetras, _opcoesCorLetras, (hex) => setState(() => _corLetras = hex)),
                                               ],
@@ -610,14 +635,14 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                   height: 140,
                                                   width: double.infinity,
                                                   decoration: BoxDecoration(
-                                                    color: Colors.grey[200],
+                                                    color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[200],
                                                     borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(color: Colors.grey[300]!),
+                                                    border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
                                                   ),
                                                   child: _isUploadingCapa 
                                                       ? Center(child: CircularProgressIndicator(color: corTemaDinamica))
                                                       : _fotoCapa.isEmpty
-                                                          ? const Center(child: Icon(Icons.wallpaper, color: Colors.grey, size: 40))
+                                                          ? Icon(Icons.wallpaper, color: textSecColor.withOpacity(0.5), size: 40)
                                                           : ClipRRect(
                                                               borderRadius: BorderRadius.circular(8),
                                                               child: _fotoCapa.startsWith('data:image')
@@ -631,7 +656,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                 children: [
                                                   ElevatedButton.icon(
                                                     style: ElevatedButton.styleFrom(
-                                                      backgroundColor: const Color(0xFFF1F3F5),
+                                                      backgroundColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F5),
                                                       foregroundColor: corTemaDinamica,
                                                       elevation: 0,
                                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -652,7 +677,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                   if (_fotoCapa.isNotEmpty && !_isUploadingCapa) ...[
                                                     const SizedBox(width: 8),
                                                     IconButton(
-                                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                                      icon: const Icon(Icons.delete, color: Colors.redAccent),
                                                       onPressed: () => setState(() => _fotoCapa = ''),
                                                       tooltip: 'Remover Capa',
                                                     ),
@@ -665,7 +690,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                       ),
                                     ),
                                     const SizedBox(height: 40),
-                                    const Divider(),
+                                    Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                                     const SizedBox(height: 16),
                                     Showcase.withWidget(
                                       key: _keyProdutos,
@@ -678,7 +703,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                           Container(
                                             padding: const EdgeInsets.all(16),
                                             decoration: BoxDecoration(
-                                              color: corTemaDinamica.withOpacity(0.05),
+                                              color: isDark ? const Color(0xFF1E1E2C) : corTemaDinamica.withOpacity(0.05),
                                               borderRadius: BorderRadius.circular(12),
                                               border: Border.all(color: corTemaDinamica.withOpacity(0.2)),
                                             ),
@@ -691,16 +716,18 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                   width: 250,
                                                   child: TextFormField(
                                                     controller: _pesquisaController,
+                                                    style: TextStyle(color: textColor),
                                                     decoration: InputDecoration(
                                                       labelText: 'Cód. ou Descrição',
+                                                      labelStyle: TextStyle(color: textSecColor),
                                                       filled: true,
-                                                      fillColor: Colors.white,
-                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                      fillColor: cardColor,
+                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
                                                       suffixIcon: _isSearching 
                                                         ? const Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2))
                                                         : IconButton(
-                                                            icon: const Icon(Icons.search, color: Colors.red),
+                                                            icon: const Icon(Icons.search, color: Colors.redAccent),
                                                             onPressed: () => _pesquisarProdutosNoBanco(_pesquisaController.text),
                                                           ),
                                                     ),
@@ -712,14 +739,17 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                   width: 320,
                                                   child: DropdownButtonFormField<int>(
                                                     isExpanded: true,
+                                                    dropdownColor: cardColor,
+                                                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                                                     decoration: InputDecoration(
                                                       labelText: 'Produto',
+                                                      labelStyle: TextStyle(color: textSecColor),
                                                       filled: true,
-                                                      fillColor: Colors.white,
-                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                      fillColor: cardColor,
+                                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: corTemaDinamica, width: 2)),
                                                     ),
-                                                    hint: const Text('Selecione...'),
+                                                    hint: Text('Selecione...', style: TextStyle(color: textSecColor)),
                                                     value: _produtoSelecionadoId,
                                                     items: _resultadosPesquisa.map((p) {
                                                       final int id = int.tryParse((p['id'] ?? p['ID'] ?? 0).toString()) ?? 0;
@@ -758,9 +788,9 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                           ),
                                           const SizedBox(height: 32),
                                           _produtosSelecionados.isEmpty
-                                              ? const Center(child: Padding(
-                                                  padding: EdgeInsets.all(32.0),
-                                                  child: Text('Nenhum produto adicionado. Use a barra de pesquisa acima.', style: TextStyle(color: Colors.grey)),
+                                              ? Center(child: Padding(
+                                                  padding: const EdgeInsets.all(32.0),
+                                                  child: Text('Nenhum produto adicionado. Use a barra de pesquisa acima.', style: TextStyle(color: textSecColor)),
                                                 ))
                                               : ListView.separated(
                                                   shrinkWrap: true,
@@ -776,7 +806,7 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
 
                                                     return Container(
                                                       decoration: BoxDecoration(
-                                                        color: Colors.white,
+                                                        color: cardColor,
                                                         borderRadius: BorderRadius.circular(12),
                                                         border: Border.all(color: corTemaDinamica, width: 1.5),
                                                         boxShadow: [BoxShadow(color: corTemaDinamica.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
@@ -788,24 +818,24 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                             leading: Container(
                                                               width: 50,
                                                               height: 50,
-                                                              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                                                              decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[200], borderRadius: BorderRadius.circular(8)),
                                                               child: ClipRRect(
                                                                 borderRadius: BorderRadius.circular(8),
                                                                 child: fotos.isEmpty || fotos.first == 'null'
-                                                                    ? const Icon(Icons.fastfood, color: Colors.grey)
+                                                                    ? Icon(Icons.fastfood, color: textSecColor)
                                                                     : fotos.first.startsWith('data:image')
                                                                         ? Image.memory(base64Decode(fotos.first.split(',')[1]), fit: BoxFit.cover)
                                                                         : Image.network(fotos.first, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
                                                               ),
                                                             ),
                                                             title: Text(nome, style: TextStyle(fontWeight: FontWeight.bold, color: corTemaDinamica)),
-                                                            subtitle: Text('Preço Base: R\$ ${p['price']} | Estoque: ${p['estoque']}', style: const TextStyle(fontSize: 12)),
+                                                            subtitle: Text('Preço Base: R\$ ${p['price']} | Estoque: ${p['estoque']}', style: TextStyle(fontSize: 12, color: textSecColor)),
                                                             trailing: IconButton(
-                                                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                                                               onPressed: () => _removerProdutoDoCatalogo(id),
                                                             ),
                                                           ),
-                                                          const Divider(height: 1),
+                                                          Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[300]),
                                                           Padding(
                                                             padding: const EdgeInsets.all(16.0),
                                                             child: Column(
@@ -819,11 +849,15 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                                       child: TextFormField(
                                                                         controller: _precoControllers[id],
                                                                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                                                                         decoration: InputDecoration(
                                                                           labelText: 'Preço Personalizado',
+                                                                          labelStyle: TextStyle(color: textSecColor),
                                                                           isDense: true,
-                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                          filled: true,
+                                                                          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica), borderRadius: BorderRadius.circular(8)),
                                                                         ),
                                                                       ),
                                                                     ),
@@ -833,11 +867,15 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                                         controller: _estoqueControllers[id],
                                                                         keyboardType: TextInputType.number,
                                                                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                                                                         decoration: InputDecoration(
                                                                           labelText: 'Qtd. neste catálogo',
+                                                                          labelStyle: TextStyle(color: textSecColor),
                                                                           isDense: true,
-                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                          filled: true,
+                                                                          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                                                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica), borderRadius: BorderRadius.circular(8)),
                                                                         ),
                                                                       ),
                                                                     ),
@@ -846,11 +884,15 @@ class _FormCatalogoPageState extends State<FormCatalogoPage> {
                                                                 const SizedBox(height: 16),
                                                                 TextFormField(
                                                                   controller: _obsControllers[id],
+                                                                  style: TextStyle(color: textColor),
                                                                   decoration: InputDecoration(
                                                                     labelText: 'Observação (Ex: Apenas Delivery, Promoção)',
+                                                                    labelStyle: TextStyle(color: textSecColor),
                                                                     isDense: true,
-                                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica)),
+                                                                    filled: true,
+                                                                    fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                                                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: corTemaDinamica), borderRadius: BorderRadius.circular(8)),
                                                                   ),
                                                                 ),
                                                               ],

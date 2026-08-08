@@ -32,6 +32,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
 
   bool _carregando = true;
   bool _isSalvando = false;
+  bool _isDarkMode = true;
 
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyGerais = GlobalKey();
@@ -43,6 +44,13 @@ class _EmpresaTabState extends State<EmpresaTab> {
     "Aqui é a parte de personalização e regras! Defina o valor mínimo para pedidos, sua chave PIX e a cor que vai estampar seu sistema.",
     "Por fim, coloque seu endereço completo e os horários de funcionamento. Ah, não esqueça de clicar no botão salvar no final da tela!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -120,7 +128,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Erro ao salvar dados. Verifique a conexão.', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.redAccent,
         ),
       );
     }
@@ -156,17 +164,16 @@ class _EmpresaTabState extends State<EmpresaTab> {
   }
 
   Widget _buildTooltipMascote(BuildContext context, String texto, bool isLast) {
-    const corTema = Color(0xFF4A0E4E);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: corTema, width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -177,12 +184,12 @@ class _EmpresaTabState extends State<EmpresaTab> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: corTema.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -190,7 +197,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -205,11 +212,11 @@ class _EmpresaTabState extends State<EmpresaTab> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: corTema,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -223,7 +230,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
             )
@@ -233,7 +240,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -246,9 +253,9 @@ class _EmpresaTabState extends State<EmpresaTab> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -260,18 +267,18 @@ class _EmpresaTabState extends State<EmpresaTab> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Esta é a tela de Configurações da Empresa. Aqui você coloca todos os dados que os clientes vão ver no seu cardápio online.\n\n"
                           "Quer que eu te mostre cada área?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -283,7 +290,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -297,20 +304,20 @@ class _EmpresaTabState extends State<EmpresaTab> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -323,13 +330,33 @@ class _EmpresaTabState extends State<EmpresaTab> {
     );
   }
 
+  InputDecoration _inputDeco(String label, IconData icon, {String? prefix}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: textSecColor),
+      prefixText: prefix,
+      prefixStyle: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+      prefixIcon: Icon(icon, color: accentColor),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: accentColor, width: 2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const corTema = Color(0xFF4A0E4E);
-
     if (_carregando) {
-      return const Center(
-        child: CircularProgressIndicator(color: corTema),
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: Center(
+          child: CircularProgressIndicator(color: accentColor),
+        ),
       );
     }
 
@@ -339,7 +366,65 @@ class _EmpresaTabState extends State<EmpresaTab> {
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: Colors.grey[100],
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: cardColor,
+            elevation: 0,
+            leading: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(Icons.menu, color: textColor),
+                  onPressed: () {
+                    context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                  },
+                  tooltip: 'Abrir Menu Lateral',
+                );
+              },
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'DADOS DA EMPRESA', 
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: accentColor.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.business, color: accentColor, size: 16),
+                    const SizedBox(width: 8),
+                    Text('CONFIGURAÇÕES', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ],
+                ),
+              )
+            ],
+          ),
           body: Stack(
             children: [
               SingleChildScrollView(
@@ -356,28 +441,34 @@ class _EmpresaTabState extends State<EmpresaTab> {
                             key: _keyGerais,
                             container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
                             child: Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: cardColor,
+                              elevation: isDark ? 4 : 2,
+                              shadowColor: Colors.black.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                              ),
                               child: Padding(
                                 padding: const EdgeInsets.all(24.0),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Row(
+                                    Row(
                                       children: [
-                                        Icon(Icons.store, color: corTema, size: 28),
-                                        SizedBox(width: 12),
-                                        Text('Dados Gerais da Empresa', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: corTema)),
+                                        Icon(Icons.store, color: accentColor, size: 28),
+                                        const SizedBox(width: 12),
+                                        Text('Dados Gerais da Empresa', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
-                                    const Divider(height: 32),
+                                    Divider(height: 32, color: isDark ? Colors.white10 : Colors.grey[200]),
                                     Row(
                                       children: [
                                         Expanded(
                                           flex: 2,
                                           child: TextFormField(
                                             controller: _nomeController,
-                                            decoration: const InputDecoration(labelText: 'Nome da Empresa', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Nome da Empresa', Icons.business),
                                             validator: (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
                                           ),
                                         ),
@@ -386,7 +477,8 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                           flex: 2,
                                           child: TextFormField(
                                             controller: _sloganController,
-                                            decoration: const InputDecoration(labelText: 'Slogan / Descrição', border: OutlineInputBorder(), prefixIcon: Icon(Icons.subtitles)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Slogan / Descrição', Icons.subtitles),
                                           ),
                                         ),
                                       ],
@@ -397,14 +489,16 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                         Expanded(
                                           child: TextFormField(
                                             controller: _cnpjController,
-                                            decoration: const InputDecoration(labelText: 'CNPJ / CPF', border: OutlineInputBorder(), prefixIcon: Icon(Icons.badge_outlined)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('CNPJ / CPF', Icons.badge_outlined),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _whatsappController,
-                                            decoration: const InputDecoration(labelText: 'WhatsApp / Telefone', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('WhatsApp / Telefone', Icons.phone),
                                             validator: (v) => v == null || v.isEmpty ? 'Informe o contato' : null,
                                           ),
                                         ),
@@ -412,7 +506,8 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                         Expanded(
                                           child: TextFormField(
                                             controller: _emailController,
-                                            decoration: const InputDecoration(labelText: 'E-mail de Contato', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email_outlined)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('E-mail de Contato', Icons.email_outlined),
                                           ),
                                         ),
                                       ],
@@ -429,52 +524,65 @@ class _EmpresaTabState extends State<EmpresaTab> {
                             key: _keyRegras,
                             container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false),
                             child: Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: cardColor,
+                              elevation: isDark ? 4 : 2,
+                              shadowColor: Colors.black.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                              ),
                               child: Padding(
                                 padding: const EdgeInsets.all(24.0),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.tune, color: corTema, size: 28),
-                                        SizedBox(width: 12),
-                                        Text('Regras do Sistema & Personalização', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: corTema)),
-                                      ],
-                                    ),
-                                    const Divider(height: 32),
                                     Row(
                                       children: [
-                                          Expanded(
+                                        Icon(Icons.tune, color: accentColor, size: 28),
+                                        const SizedBox(width: 12),
+                                        Text('Regras do Sistema & Personalização', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
+                                      ],
+                                    ),
+                                    Divider(height: 32, color: isDark ? Colors.white10 : Colors.grey[200]),
+                                    Row(
+                                      children: [
+                                        Expanded(
                                           child: TextFormField(
-                                              controller: _valorMinimoController,
-                                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                              decoration: const InputDecoration(
-                                              labelText: 'Pedido Mínimo (R\$)',
-                                              prefixText: 'R\$ ',           
-                                              border: OutlineInputBorder(),
-                                              prefixIcon: Icon(Icons.attach_money),
-                                              ),
-                                              validator: (v) => v == null || v.isEmpty ? 'Informe o valor mínimo' : null,
+                                            controller: _valorMinimoController,
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                            decoration: _inputDeco('Pedido Mínimo', Icons.attach_money, prefix: 'R\$ '),
+                                            validator: (v) => v == null || v.isEmpty ? 'Informe o valor mínimo' : null,
                                           ),
-                                          ),
+                                        ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _chavePixController,
-                                            decoration: const InputDecoration(labelText: 'Chave PIX Oficial', border: OutlineInputBorder(), prefixIcon: Icon(Icons.pix)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Chave PIX Oficial', Icons.pix),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _corTemaController,
-                                            decoration: const InputDecoration(
+                                            style: TextStyle(color: textColor),
+                                            decoration: InputDecoration(
                                               labelText: 'Cor Primária (Hex)',
+                                              labelStyle: TextStyle(color: textSecColor),
                                               hintText: '#4A0E4E',
-                                              border: OutlineInputBorder(),
-                                              prefixIcon: Icon(Icons.color_lens_outlined),
+                                              hintStyle: TextStyle(color: textSecColor.withOpacity(0.5)),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderSide: BorderSide(color: accentColor, width: 2),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              prefixIcon: Icon(Icons.color_lens_outlined, color: accentColor),
                                             ),
                                           ),
                                         ),
@@ -492,35 +600,42 @@ class _EmpresaTabState extends State<EmpresaTab> {
                             key: _keyEndereco,
                             container: _buildTooltipMascote(showcaseContext, _textosMascote[2], true),
                             child: Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: cardColor,
+                              elevation: isDark ? 4 : 2,
+                              shadowColor: Colors.black.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                              ),
                               child: Padding(
                                 padding: const EdgeInsets.all(24.0),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Row(
+                                    Row(
                                       children: [
-                                        Icon(Icons.location_on, color: corTema, size: 28),
-                                        SizedBox(width: 12),
-                                        Text('Endereço e Funcionamento', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: corTema)),
+                                        Icon(Icons.location_on, color: accentColor, size: 28),
+                                        const SizedBox(width: 12),
+                                        Text('Endereço e Funcionamento', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
-                                    const Divider(height: 32),
+                                    Divider(height: 32, color: isDark ? Colors.white10 : Colors.grey[200]),
                                     Row(
                                       children: [
                                         Expanded(
                                           flex: 3,
                                           child: TextFormField(
                                             controller: _ruaController,
-                                            decoration: const InputDecoration(labelText: 'Rua / Logradouro', border: OutlineInputBorder()),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Rua / Logradouro', Icons.map_outlined),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _numeroController,
-                                            decoration: const InputDecoration(labelText: 'Número', border: OutlineInputBorder()),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Número', Icons.tag),
                                           ),
                                         ),
                                       ],
@@ -531,22 +646,25 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                         Expanded(
                                           child: TextFormField(
                                             controller: _bairroController,
-                                            decoration: const InputDecoration(labelText: 'Bairro', border: OutlineInputBorder()),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Bairro', Icons.holiday_village_outlined),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _cidadeController,
-                                            decoration: const InputDecoration(labelText: 'Cidade', border: OutlineInputBorder()),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Cidade', Icons.location_city_outlined),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         SizedBox(
-                                          width: 90,
+                                          width: 100,
                                           child: TextFormField(
                                             controller: _ufController,
-                                            decoration: const InputDecoration(labelText: 'UF', border: OutlineInputBorder()),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('UF', Icons.map),
                                           ),
                                         ),
                                       ],
@@ -557,14 +675,16 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                         Expanded(
                                           child: TextFormField(
                                             controller: _horarioController,
-                                            decoration: const InputDecoration(labelText: 'Horário de Funcionamento', border: OutlineInputBorder(), prefixIcon: Icon(Icons.access_time)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Horário de Funcionamento', Icons.access_time),
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: TextFormField(
                                             controller: _instagramController,
-                                            decoration: const InputDecoration(labelText: 'Instagram', border: OutlineInputBorder(), prefixIcon: Icon(Icons.camera_alt_outlined)),
+                                            style: TextStyle(color: textColor),
+                                            decoration: _inputDeco('Instagram', Icons.camera_alt_outlined),
                                           ),
                                         ),
                                       ],
@@ -581,7 +701,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                             height: 55,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: corTema,
+                                backgroundColor: accentColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 elevation: 4,
@@ -609,13 +729,13 @@ class _EmpresaTabState extends State<EmpresaTab> {
                 bottom: 24,
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
+                          color: accentColor.withOpacity(0.3),
                           blurRadius: 15,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
@@ -631,7 +751,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),

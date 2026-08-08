@@ -26,6 +26,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
   bool _loading = true;
   int _paginaAtual = 1;
   bool _temMais = true;
+  bool _isDarkMode = true; 
 
   final List<String> _statusValidos = [
     'Finalizado', 
@@ -38,8 +39,15 @@ class _MinhasVendasState extends State<MinhasVendas> {
 
   final List<String> _textosMascote = [
     "Bem-vindo ao seu Histórico de Vendas! Aqui em cima, você pode digitar o número do cupom ou o nome do cliente para achar uma venda rapidamente.",
-    "Nesta lista ficam as vendas de balcão (PDV). Clique nos três pontinhos à direita para enviar o cupom via WhatsApp, E-mail, Reimprimir ou Cancelar a venda!"
+    "Nesta lista ficam as vendas de balcão. Clique na venda para ver os detalhes e nos três pontinhos para enviar via WhatsApp, E-mail, Reimprimir ou Cancelar!"
   ];
+
+  bool get isDark => _isDarkMode;
+  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+  Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
+  Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
+  Color get textColor => isDark ? Colors.white : Colors.black87;
+  Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
   @override
   void initState() {
@@ -106,8 +114,8 @@ class _MinhasVendasState extends State<MinhasVendas> {
 
   Color _getCorStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'finalizado': return Colors.green;
-      case 'cancelado': return Colors.red;
+      case 'finalizado': return Colors.greenAccent[700] ?? Colors.green;
+      case 'cancelado': return Colors.redAccent;
       default: return Colors.grey;
     }
   }
@@ -121,8 +129,8 @@ class _MinhasVendasState extends State<MinhasVendas> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Venda #$id alterada para: $novoStatus!'),
-        backgroundColor: novoStatus == 'Cancelado' ? Colors.red : Colors.green,
+        content: Text('Venda #$id alterada para: $novoStatus!', style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: novoStatus == 'Cancelado' ? Colors.redAccent : Colors.green,
         duration: const Duration(seconds: 2),
       )
     );
@@ -134,23 +142,29 @@ class _MinhasVendasState extends State<MinhasVendas> {
     }
   }
 
-  // --- FUNÇÕES DE AÇÃO DOS 3 PONTINHOS ---
-
   void _dialogWhatsApp(Map<String, dynamic> v) {
     final telefoneController = TextEditingController(text: v['cliente_telefone'] ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Enviar Cupom via WhatsApp', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Enviar via WhatsApp', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: telefoneController,
           keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(labelText: 'Número com DDD (Ex: 85999999999)', border: OutlineInputBorder()),
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            labelText: 'Número com DDD (Ex: 85999999999)',
+            labelStyle: TextStyle(color: textSecColor),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               Navigator.pop(ctx);
               _enviarWhatsApp(telefoneController.text, v);
@@ -170,25 +184,33 @@ class _MinhasVendasState extends State<MinhasVendas> {
     final total = double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0;
     final msg = 'Olá! Agradecemos sua compra na *Açaiteria Shalom*.\n\nSeu pedido *#${v['id']}* no valor de *R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}* foi finalizado com sucesso! 🍇\n\nVolte sempre!';
     
-    final url = 'whatsapp://send?phone=$telLimpo&text=${Uri.encodeComponent(msg)}';
+    final url = 'https://api.whatsapp.com/send?phone=$telLimpo&text=${Uri.encodeComponent(msg)}';
     html.window.open(url, '_blank');
   }
 
   void _dialogEmail(Map<String, dynamic> v) {
-    final emailController = TextEditingController();
+    final emailController = TextEditingController(text: v['cliente_email'] ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Enviar Cupom via E-mail', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Enviar via E-mail', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Endereço de E-mail do Cliente', border: OutlineInputBorder()),
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            labelText: 'Endereço de E-mail do Cliente',
+            labelStyle: TextStyle(color: textSecColor),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               Navigator.pop(ctx);
               _enviarEmail(emailController.text, v);
@@ -215,12 +237,14 @@ class _MinhasVendasState extends State<MinhasVendas> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancelar Venda', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-        content: Text('Tem certeza de que deseja cancelar a venda de balcão #$id? Esta ação irá alterar as métricas financeiras.'),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancelar Venda', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+        content: Text('Tem certeza de que deseja cancelar a venda #$id? Esta ação irá alterar as métricas financeiras.', style: TextStyle(color: textColor)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Voltar', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               Navigator.pop(ctx);
               _alterarStatusVenda(id, 'Cancelado');
@@ -231,8 +255,6 @@ class _MinhasVendasState extends State<MinhasVendas> {
       ),
     );
   }
-
-  // ---------------------------------------------
 
   String _formatarFormaPagamento(String? forma) {
     if (forma == null || forma.isEmpty) return 'Não Especificada';
@@ -260,10 +282,10 @@ class _MinhasVendasState extends State<MinhasVendas> {
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 15, spreadRadius: 3)],
-          border: Border.all(color: const Color(0xFF4A0E4E), width: 3),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, spreadRadius: 3)],
+          border: Border.all(color: accentColor, width: 3),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -274,12 +296,12 @@ class _MinhasVendasState extends State<MinhasVendas> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(color: const Color(0xFF4A0E4E).withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
                     child: Image.asset(
                       'assets/images/mascote_acenando.gif',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.record_voice_over, color: Color(0xFF4A0E4E)),
+                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
                     ),
                   ),
                 ),
@@ -287,7 +309,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                 Expanded(
                   child: Text(
                     texto,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87, height: 1.4),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -302,11 +324,11 @@ class _MinhasVendasState extends State<MinhasVendas> {
                     ShowCaseWidget.of(context).dismiss();
                   },
                   icon: const Icon(Icons.cancel, size: 20, color: Colors.redAccent),
-                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text('Parar Tour', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A0E4E),
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -320,7 +342,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                     }
                   },
                   icon: Icon(isLast ? Icons.check_circle : Icons.arrow_forward_ios, size: 16),
-                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
             )
@@ -330,7 +352,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
     );
   }
 
-  void _mostrarMensagemMascote(BuildContext showcaseContext, Color corTema) {
+  void _mostrarMensagemMascote(BuildContext showcaseContext) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -343,9 +365,9 @@ class _MinhasVendasState extends State<MinhasVendas> {
             padding: const EdgeInsets.all(24),
             constraints: const BoxConstraints(maxWidth: 600),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: corTema, width: 3),
+              border: Border.all(color: accentColor, width: 3),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
             ),
             child: Column(
@@ -357,13 +379,13 @@ class _MinhasVendasState extends State<MinhasVendas> {
                     Image.asset(
                       'assets/images/mascote_acenando.gif',
                       width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: corTema),
+                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Esta é a tela de Minhas Vendas do PDV. Aqui você pode:\n"
@@ -371,7 +393,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                           "• Clicar nos três pontinhos para opções rápidas\n"
                           "• Enviar o recibo via WhatsApp ou E-mail\n\n"
                           "Quer que eu te mostre como funciona rapidinho?",
-                          style: TextStyle(fontSize: 15, color: Colors.grey[800], height: 1.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -383,7 +405,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: corTema,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -396,20 +418,20 @@ class _MinhasVendasState extends State<MinhasVendas> {
                           ]);
                         },
                         icon: const Icon(Icons.slideshow, size: 24),
-                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        label: const Text('Sim, Iniciar Tour', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: corTema,
-                          side: BorderSide(color: corTema, width: 2),
+                          foregroundColor: textColor,
+                          side: BorderSide(color: textSecColor, width: 2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: const Text('Agora não', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       )
                     ),
                   ],
@@ -517,98 +539,139 @@ class _MinhasVendasState extends State<MinhasVendas> {
       ),
     );
 
-    await Printing.sharePdf(bytes: await pdf.save(), filename: 'Cupom_Reimpresso_$id.pdf');
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'Cupom_Reimpresso_$id.pdf');
   }
 
   @override
   Widget build(BuildContext context) {
-    const corTema = Color(0xFF4A0E4E);
-
     return ShowCaseWidget(
       onStart: (index, key) => _playAudioForStep(index),
       onComplete: (index, key) => _flutterTts.stop(),
       onFinish: () => _flutterTts.stop(),
       builder: (showcaseContext) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F8),
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: cardColor,
+            elevation: 0,
+            leading: Builder(
+              builder: (BuildContext context) {
+                return IconButton(
+                  icon: Icon(Icons.menu, color: textColor),
+                  onPressed: () {
+                    context.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                  },
+                  tooltip: 'Abrir Menu Lateral',
+                );
+              },
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 2),
+                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'HISTÓRICO DE VENDAS', 
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: textColor),
+                tooltip: 'Alternar Tema',
+                onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: accentColor.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.history, color: accentColor, size: 16),
+                    const SizedBox(width: 8),
+                    Text('${_vendasFiltradas.length} REGISTROS', style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ],
+                ),
+              )
+            ],
+          ),
           body: Stack(
             children: [
               Column(
                 children: [
-                  // Cabeçalho e Barra de Pesquisa
                   Container(
                     width: double.infinity,
-                    color: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.analytics_outlined, color: corTema),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Histórico de Vendas Balcão (${_vendasFiltradas.length} itens listados)',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: corTema),
-                            ),
-                          ],
+                    color: cardColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    child: Showcase.withWidget(
+                      key: _keyBusca,
+                      container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
+                      child: TextField(
+                        controller: _buscaController,
+                        onChanged: _filtrarVendas,
+                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          hintText: 'Pesquise por ID da Venda ou Nome do Cliente...',
+                          hintStyle: TextStyle(color: textSecColor),
+                          prefixIcon: Icon(Icons.search, color: accentColor),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
                         ),
-                        const SizedBox(height: 16),
-                        Showcase.withWidget(
-                          key: _keyBusca,
-                          container: _buildTooltipMascote(showcaseContext, _textosMascote[0], false),
-                          child: TextField(
-                            controller: _buscaController,
-                            onChanged: _filtrarVendas,
-                            decoration: InputDecoration(
-                              hintText: 'Pesquisar por ID da Venda ou Nome do Cliente...',
-                              prefixIcon: const Icon(Icons.search, color: corTema),
-                              filled: true,
-                              fillColor: const Color(0xFFF4F6F8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
 
-                  // Lista de Vendas
                   Expanded(
                     child: _loading
-                      ? const Center(child: CircularProgressIndicator(color: corTema))
+                      ? Center(child: CircularProgressIndicator(color: accentColor))
                       : _vendasFiltradas.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.history_toggle_off, size: 64, color: Colors.grey[300]),
+                                  Icon(Icons.history_toggle_off, size: 64, color: textSecColor.withOpacity(0.5)),
                                   const SizedBox(height: 16),
                                   Text(
                                     _buscaController.text.isNotEmpty 
                                       ? 'Nenhuma venda encontrada para esta pesquisa.'
                                       : 'Nenhuma venda registrada no PDV ainda.', 
-                                    style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.bold)
+                                    style: TextStyle(color: textSecColor, fontSize: 16, fontWeight: FontWeight.bold)
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 24),
                                   ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(backgroundColor: corTema),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: accentColor,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                                    ),
                                     onPressed: () {
                                       _buscaController.clear();
                                       _carregarVendas();
                                     },
                                     icon: const Icon(Icons.refresh, color: Colors.white),
-                                    label: const Text('Atualizar Histórico', style: TextStyle(color: Colors.white)),
+                                    label: const Text('Atualizar Histórico', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                   )
                                 ],
                               ),
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(24),
                               itemCount: _vendasFiltradas.length + (_temMais && _buscaController.text.isEmpty ? 1 : 0),
                               itemBuilder: (context, idx) {
                                 if (idx == _vendasFiltradas.length) {
@@ -617,8 +680,8 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                     child: Center(
                                       child: TextButton.icon(
                                         onPressed: () => _carregarVendas(carregarMais: true),
-                                        icon: const Icon(Icons.add, color: corTema),
-                                        label: const Text('Carregar Mais', style: TextStyle(color: corTema, fontWeight: FontWeight.bold)),
+                                        icon: Icon(Icons.add, color: accentColor),
+                                        label: Text('Carregar Mais', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
                                   );
@@ -641,26 +704,31 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                 final corStatus = _getCorStatus(statusAtual);
 
                                 Widget cardVenda = Card(
-                                  elevation: 0,
-                                  margin: const EdgeInsets.only(bottom: 12),
+                                  color: cardColor,
+                                  elevation: 4,
+                                  shadowColor: Colors.black.withOpacity(0.1),
+                                  margin: const EdgeInsets.only(bottom: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(color: Colors.grey[200]!),
+                                    side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
                                   ),
                                   child: ExpansionTile(
-                                    leading: const CircleAvatar(
-                                      backgroundColor: Color(0xFFFFD700),
-                                      child: Icon(Icons.receipt_long, color: Colors.black),
+                                    iconColor: accentColor,
+                                    collapsedIconColor: textSecColor,
+                                    leading: Container(
+                                      width: 48, height: 48,
+                                      decoration: BoxDecoration(color: const Color(0xFFFFD700).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                                      child: const Icon(Icons.receipt_long, color: Color(0xFFFFD700)),
                                     ),
-                                    title: Text('Venda #$id - $cliente', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    title: Text('Venda #$id - $cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
                                     subtitle: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const SizedBox(height: 4),
-                                        Text('Data: $data | Pgto: ${_formatarFormaPagamento(formaPgto)}'),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 6),
+                                        Text('Data: $data | Pgto: ${_formatarFormaPagamento(formaPgto)}', style: TextStyle(color: textSecColor, fontSize: 13)),
+                                        const SizedBox(height: 8),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: corStatus.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(6),
@@ -674,12 +742,12 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                       ],
                                     ),
                                     trailing: Text('R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}', 
-                                      style: const TextStyle(fontWeight: FontWeight.w900, color: corTema, fontSize: 18)),
+                                      style: TextStyle(fontWeight: FontWeight.w900, color: accentColor, fontSize: 20)),
                                     children: [
-                                      const Divider(height: 1),
+                                      Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
                                       Container(
-                                        color: const Color(0xFFFAFAFA),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFFAFAFA),
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                         child: Column(
                                           children: [
                                             ...itens.map((item) {
@@ -693,37 +761,39 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                   : '${rawQtd.toStringAsFixed(0)}x';
 
                                               return Padding(
-                                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                                padding: const EdgeInsets.symmetric(vertical: 6),
                                                 child: Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text("$qtdTexto $nomeItem", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                    Text("R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}"),
+                                                    Text("$qtdTexto $nomeItem", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                                    Text("R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}", style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
                                                   ],
                                                 ),
                                               );
                                             }),
-                                            const Divider(),
+                                            const SizedBox(height: 16),
+                                            Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
+                                            const SizedBox(height: 8),
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                // Dropdown de Alterar Status
                                                 Row(
                                                   children: [
-                                                    const Text('Situação: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                                                    Text('Situação: ', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
                                                     Container(
-                                                      height: 36,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                      height: 40,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12),
                                                       decoration: BoxDecoration(
-                                                        color: Colors.white,
-                                                        border: Border.all(color: Colors.grey[300]!),
+                                                        color: cardColor,
+                                                        border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
                                                         borderRadius: BorderRadius.circular(8),
                                                       ),
                                                       child: DropdownButtonHideUnderline(
                                                         child: DropdownButton<String>(
                                                           value: statusFormatado,
-                                                          icon: const Icon(Icons.arrow_drop_down, color: corTema),
-                                                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                                          icon: Icon(Icons.arrow_drop_down, color: accentColor),
+                                                          dropdownColor: cardColor,
+                                                          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
                                                           items: _statusValidos.map((s) {
                                                             return DropdownMenuItem(
                                                               value: s,
@@ -741,16 +811,16 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                   ],
                                                 ),
                                                 
-                                                // Menu de 3 Pontinhos com Ações Especiais (Somente Ícones)
                                                 Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    border: Border.all(color: Colors.grey[300]!),
+                                                    color: cardColor,
+                                                    border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
                                                   child: PopupMenuButton<String>(
-                                                    icon: const Icon(Icons.more_vert, color: corTema),
+                                                    icon: Icon(Icons.more_vert, color: accentColor),
                                                     tooltip: 'Ações da Venda',
+                                                    color: cardColor,
                                                     offset: const Offset(0, 40),
                                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                                     onSelected: (valor) {
@@ -760,35 +830,11 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                       if (valor == 'cancel') _confirmarCancelarVenda(id);
                                                     },
                                                     itemBuilder: (context) => [
-                                                      PopupMenuItem(
-                                                        enabled: false, // Deixa a linha interativa apenas pelos botões
-                                                        child: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            IconButton(
-                                                              icon: const Icon(Icons.message, color: Colors.green), // Substituído Icons.whatsapp por Icons.message
-                                                              tooltip: 'WhatsApp',
-                                                              onPressed: () { Navigator.pop(context); _dialogWhatsApp(v); },
-                                                            ),
-                                                            IconButton(
-                                                              icon: const Icon(Icons.email, color: Colors.blue),
-                                                              tooltip: 'E-mail',
-                                                              onPressed: () { Navigator.pop(context); _dialogEmail(v); },
-                                                            ),
-                                                            IconButton(
-                                                              icon: const Icon(Icons.print, color: Colors.black87),
-                                                              tooltip: 'Reimprimir',
-                                                              onPressed: () { Navigator.pop(context); _reimprimirCupomPdf(v); },
-                                                            ),
-                                                            if (statusFormatado != 'Cancelado')
-                                                              IconButton(
-                                                                icon: const Icon(Icons.cancel, color: Colors.red),
-                                                                tooltip: 'Cancelar',
-                                                                onPressed: () { Navigator.pop(context); _confirmarCancelarVenda(id); },
-                                                              ),
-                                                          ],
-                                                        ),
-                                                      ),
+                                                      PopupMenuItem(value: 'wpp', child: Row(children: [const Icon(Icons.message, color: Colors.green), const SizedBox(width: 12), Text('WhatsApp', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                      PopupMenuItem(value: 'email', child: Row(children: [const Icon(Icons.email, color: Colors.blue), const SizedBox(width: 12), Text('E-mail', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                      PopupMenuItem(value: 'print', child: Row(children: [Icon(Icons.print, color: textColor), const SizedBox(width: 12), Text('Reimprimir', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                      if (statusFormatado != 'Cancelado')
+                                                        PopupMenuItem(value: 'cancel', child: Row(children: [const Icon(Icons.cancel, color: Colors.red), const SizedBox(width: 12), Text('Cancelar', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold))])),
                                                     ],
                                                   ),
                                                 ),
@@ -820,14 +866,14 @@ class _MinhasVendasState extends State<MinhasVendas> {
                 bottom: 24,
                 right: 24,
                 child: GestureDetector(
-                  onTap: () => _mostrarMensagemMascote(showcaseContext, corTema),
+                  onTap: () => _mostrarMensagemMascote(showcaseContext),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: corTema.withOpacity(0.3),
-                          blurRadius: 15,
+                          color: accentColor.withOpacity(0.5),
+                          blurRadius: 20,
                           spreadRadius: 2,
                           offset: const Offset(0, 5),
                         )
@@ -842,7 +888,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 70, height: 70,
-                          decoration: const BoxDecoration(color: corTema, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
                           child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
                         ),
                       ),
