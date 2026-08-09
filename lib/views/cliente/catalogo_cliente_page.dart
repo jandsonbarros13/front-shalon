@@ -413,7 +413,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                       : CarrosselFotosPublicoWidget(key: ValueKey('modal_$id'), fotos: imgModal.split('|||').where((s) => s.isNotEmpty).toList()),
                 ),
                 Positioned(
-                  top: isMobile ? 32 : 16,
+                  top: 16,
                   left: 16,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -421,15 +421,6 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                     child: Text(categoria.toUpperCase(), style: TextStyle(color: corLetras, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
                   ),
                 ),
-                if (isMobile)
-                  Positioned(
-                    top: 24,
-                    right: 16,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: IconButton(icon: const Icon(Icons.close, color: Colors.black), onPressed: () => Navigator.pop(context)),
-                    ),
-                  )
               ],
             );
 
@@ -439,10 +430,16 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(p['name'] ?? '', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 24 : 32, color: corTema, height: 1.1))),
-                      if (!isMobile)
-                        IconButton(icon: const Icon(Icons.close, color: Colors.grey, size: 28), onPressed: () => Navigator.pop(context)),
+                      Expanded(child: Text(p['name'] ?? '', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 22 : 32, color: corTema, height: 1.1))),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey, size: 28), 
+                        onPressed: () => Navigator.pop(context), 
+                        padding: EdgeInsets.zero, 
+                        constraints: const BoxConstraints()
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -460,6 +457,15 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                         shrinkWrap: true,
                         padding: const EdgeInsets.only(right: 12),
                         children: [
+                          if (isMobile)
+                            Container(
+                              height: 250,
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+                              child: imagemDestaque,
+                            ),
                           Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
                           
                           if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
@@ -590,7 +596,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                                           ),
                                         ),
                                         Container(
-                                          width: 40,
+                                          width: 28,
                                           decoration: BoxDecoration(
                                             color: Colors.grey[50],
                                             border: Border(left: BorderSide(color: Colors.grey[200]!)),
@@ -601,14 +607,14 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                                               Expanded(
                                                 child: InkWell(
                                                   onTap: () => scrollVertical(-200),
-                                                  child: Center(child: Icon(Icons.arrow_drop_up, size: 36, color: corTema)),
+                                                  child: Center(child: Icon(Icons.arrow_drop_up, size: 20, color: corTema)),
                                                 ),
                                               ),
                                               const Divider(height: 1),
                                               Expanded(
                                                 child: InkWell(
                                                   onTap: () => scrollVertical(200),
-                                                  child: Center(child: Icon(Icons.arrow_drop_down, size: 36, color: corTema)),
+                                                  child: Center(child: Icon(Icons.arrow_drop_down, size: 20, color: corTema)),
                                                 ),
                                               ),
                                             ]
@@ -715,12 +721,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
               width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.8,
               height: isMobile ? double.infinity : MediaQuery.of(context).size.height * 0.9,
               child: isMobile 
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(height: 250, width: double.infinity, child: imagemDestaque),
-                      Expanded(child: Padding(padding: const EdgeInsets.all(20.0), child: buildConteudoModal())),
-                    ],
+                ? SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0), 
+                      child: buildConteudoModal(),
+                    ),
                   )
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

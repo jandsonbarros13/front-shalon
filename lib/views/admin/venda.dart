@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:acaiteria_front/features/auth/services/produto_service.dart';
 import 'package:acaiteria_front/features/auth/services/vendas_service.dart';
+import 'package:acaiteria_front/features/auth/services/caixa_service.dart'; 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -19,6 +20,8 @@ class VendaPage extends StatefulWidget {
 class _VendaPageState extends State<VendaPage> {
   final _produtoService = ProdutoService();
   final _vendasService = VendasService();
+  final _caixaService = CaixaService(); 
+
   final _codigoInputController = TextEditingController();
   final _quantidadeController = TextEditingController(text: '1.000');
   final _nomeClienteController = TextEditingController();
@@ -28,7 +31,11 @@ class _VendaPageState extends State<VendaPage> {
 
   List<Map<String, dynamic>> _carrinho = [];
   Map<String, dynamic>? _produtoUltimoLancado;
+  
   bool _buscando = false;
+  bool _carregandoCaixa = true;
+  bool _isCaixaAberto = false; 
+  
   double _descontoVenda = 0.0;
   
   final ValueNotifier<bool> _isDarkModeNotifier = ValueNotifier<bool>(true); 
@@ -56,7 +63,7 @@ class _VendaPageState extends State<VendaPage> {
   @override
   void initState() {
     super.initState();
-    _focoCodigo.requestFocus();
+    _verificarStatusCaixa();
     _flutterTts.setLanguage("pt-BR");
   }
 
@@ -71,6 +78,24 @@ class _VendaPageState extends State<VendaPage> {
     _isDarkModeNotifier.dispose();
     _flutterTts.stop();
     super.dispose();
+  }
+
+  Future<void> _verificarStatusCaixa() async {
+    setState(() => _carregandoCaixa = true);
+    try {
+      final status = await _caixaService.obterStatusCaixa();
+      if (mounted) {
+        setState(() {
+          _isCaixaAberto = status['isAberto'] ?? false;
+          _carregandoCaixa = false;
+        });
+        if (_isCaixaAberto) {
+          _focoCodigo.requestFocus();
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _carregandoCaixa = false);
+    }
   }
 
   void _playAudioForStep(int? index) async {
@@ -153,7 +178,7 @@ class _VendaPageState extends State<VendaPage> {
                   label: Text(isLast ? 'Concluir' : 'Próximo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 )
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -258,6 +283,12 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _abrirModalVendaAvulsa() {
+    // 👇 Bloqueio se caixa estiver fechado
+    if (!_isCaixaAberto) {
+      _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para lançar itens!', Colors.redAccent);
+      return;
+    }
+
     final nomeController = TextEditingController(text: 'SORVETE');
     final valorController = TextEditingController();
 
@@ -346,6 +377,12 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   Future<void> _tentarLancarProduto() async {
+    // 👇 Bloqueio se caixa estiver fechado
+    if (!_isCaixaAberto) {
+      _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para lançar itens!', Colors.redAccent);
+      return;
+    }
+
     final termo = _codigoInputController.text.trim();
     if (termo.isEmpty) return;
 
@@ -1109,6 +1146,12 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _finalizarVenda() async {
+    // 👇 Bloqueio se caixa estiver fechado
+    if (!_isCaixaAberto) {
+      _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para finalizar!', Colors.redAccent);
+      return;
+    }
+
     if (_carrinho.isEmpty) return;
 
     bool isMobileModal = MediaQuery.of(context).size.width < 800;
@@ -1661,7 +1704,7 @@ class _VendaPageState extends State<VendaPage> {
       onComplete: (index, key) => _flutterTts.stop(),
       onFinish: () {
         _flutterTts.stop();
-        _focoCodigo.requestFocus();
+        if (_isCaixaAberto) _focoCodigo.requestFocus();
       },
       builder: (showcaseContext) {
         return ValueListenableBuilder<bool>(
@@ -1726,7 +1769,7 @@ class _VendaPageState extends State<VendaPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text('AÇAITERIA SHALOM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: isMobile ? 14 : 16), overflow: TextOverflow.ellipsis),
-                                        Text('PONTO DE VENDA (PDV)', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 10)),
+                                        const Text('PONTO DE VENDA (PDV)', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 10)),
                                       ],
                                     ),
                                   ),
@@ -1747,15 +1790,15 @@ class _VendaPageState extends State<VendaPage> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: Colors.greenAccent.withOpacity(0.15),
+                                      color: _isCaixaAberto ? Colors.greenAccent.withOpacity(0.15) : Colors.redAccent.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(30),
-                                      border: Border.all(color: Colors.greenAccent.withOpacity(0.5)),
+                                      border: Border.all(color: _isCaixaAberto ? Colors.greenAccent.withOpacity(0.5) : Colors.redAccent.withOpacity(0.5)),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       children: [
-                                        Icon(Icons.point_of_sale, color: Colors.greenAccent, size: 16),
-                                        SizedBox(width: 8),
-                                        Text('CAIXA ABERTO', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                        Icon(_isCaixaAberto ? Icons.point_of_sale : Icons.lock, color: _isCaixaAberto ? Colors.greenAccent : Colors.redAccent, size: 16),
+                                        const SizedBox(width: 8),
+                                        Text(_isCaixaAberto ? 'CAIXA ABERTO' : 'CAIXA FECHADO', style: TextStyle(color: _isCaixaAberto ? Colors.greenAccent : Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
                                       ],
                                     ),
                                   ),
@@ -1765,8 +1808,11 @@ class _VendaPageState extends State<VendaPage> {
                           ],
                         ),
                       ),
+
                       Expanded(
-                        child: isMobile
+                        child: _carregandoCaixa 
+                          ? Center(child: CircularProgressIndicator(color: accentColor))
+                          : isMobile
                             ? SingleChildScrollView(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(

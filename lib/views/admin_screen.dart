@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'admin/dashboard_tab.dart';
 import 'admin/venda.dart';
+import 'admin/caixa_tab.dart';
 import 'admin/minhasVendas.dart';
 import 'admin/categorias_tab.dart';
 import 'admin/produtos_tab.dart';
@@ -40,6 +41,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   final List<String> _titulos = [
     'Dashboard Shalom',
     'Ponto de Venda (PDV)',
+    'Gestão de Caixa',
     'Histórico de Vendas',
     'Controle de Tipos/Categorias',
     'Controle de Produtos',
@@ -53,6 +55,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   final List<Widget> _abas = [
     const DashboardTab(),
     const VendaPage(),
+    const CaixaTab(),
     const MinhasVendas(),
     const CategoriasTab(),
     const ProdutosTab(),
@@ -191,7 +194,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                _mudarAba(5); 
+                _mudarAba(6); // Ajustado o índice para Pedidos após a inserção do Caixa
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -229,7 +232,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                _mudarAba(5); 
+                _mudarAba(6); // Ajustado o índice para Pedidos após a inserção do Caixa
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -396,7 +399,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       child: Scaffold(
         key: _scaffoldKey, 
         backgroundColor: bgColor,
-        appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].contains(_abaSelecionada)
+        appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].contains(_abaSelecionada)
             ? null 
             : AppBar(
                 title: Text(_titulos[_abaSelecionada], style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
@@ -438,14 +441,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   children: [
                     _buildItemMenu(Icons.dashboard, 'Dashboard', 0, accentColor, textColor),
                     _buildItemMenu(Icons.point_of_sale, 'Vendas (PDV)', 1, accentColor, textColor),
-                    _buildItemMenu(Icons.history_toggle_off, 'Histórico de Vendas', 2, accentColor, textColor),
-                    _buildItemMenu(Icons.category, 'Controle de Tipos/Categorias', 3, accentColor, textColor),
-                    _buildItemMenu(Icons.icecream_outlined, 'Controle de Produtos', 4, accentColor, textColor),
-                    _buildItemMenu(Icons.list_alt, 'Pedidos da Loja', 5, accentColor, textColor),
-                    _buildItemMenu(Icons.auto_stories, 'Catálogo Digital', 6, accentColor, textColor),
-                    _buildItemMenu(Icons.people, 'Controle de Usuários', 7, accentColor, textColor),
-                    _buildItemMenu(Icons.local_shipping, 'Configuração de Frete', 8, accentColor, textColor),
-                    _buildItemMenu(Icons.business, 'Dados da Empresa', 9, accentColor, textColor),
+                    _buildItemMenu(Icons.account_balance_wallet, 'Gestão de Caixa', 2, accentColor, textColor), // Nova Tela Adicionada
+                    _buildItemMenu(Icons.history_toggle_off, 'Histórico de Vendas', 3, accentColor, textColor),
+                    _buildItemMenu(Icons.category, 'Controle de Tipos/Categorias', 4, accentColor, textColor),
+                    _buildItemMenu(Icons.icecream_outlined, 'Controle de Produtos', 5, accentColor, textColor),
+                    _buildItemMenu(Icons.list_alt, 'Pedidos da Loja', 6, accentColor, textColor),
+                    _buildItemMenu(Icons.auto_stories, 'Catálogo Digital', 7, accentColor, textColor),
+                    _buildItemMenu(Icons.people, 'Controle de Usuários', 8, accentColor, textColor),
+                    _buildItemMenu(Icons.local_shipping, 'Configuração de Frete', 9, accentColor, textColor),
+                    _buildItemMenu(Icons.business, 'Dados da Empresa', 10, accentColor, textColor),
                   ],
                 ),
               ),
