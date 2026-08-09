@@ -1041,7 +1041,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
               children: [
                 Container(
                   width: double.infinity,
-                  height: isMobile ? 220 : 380, 
+                  height: isMobile ? 220 : 570, 
                   decoration: BoxDecoration(color: corTema.withOpacity(0.1)),
                   child: Stack(
                     fit: StackFit.expand,
