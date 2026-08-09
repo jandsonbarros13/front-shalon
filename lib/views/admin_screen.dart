@@ -22,13 +22,20 @@ class AdminScreen extends StatefulWidget {
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> {
+class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStateMixin {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
   int _abaSelecionada = 0;
   final _pedidoService = PedidoService();
   Timer? _timerGlobal;
+  Timer? _transitionTimer;
   int _ultimoPedidoConhecido = 0;
   bool _isInitialLoad = true;
   bool _isDarkMode = true; 
+  
+  bool _isTransitioning = true; 
+  
+  late AnimationController _loaderController;
 
   final List<String> _titulos = [
     'Dashboard Shalom',
@@ -61,11 +68,26 @@ class _AdminScreenState extends State<AdminScreen> {
     super.initState();
     _solicitarPermissaoNotificacao();
     _iniciarEscutaGlobalPedidos();
+
+    _loaderController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _transitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _isTransitioning = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _timerGlobal?.cancel();
+    _transitionTimer?.cancel(); 
+    _loaderController.dispose();
     super.dispose();
   }
 
@@ -169,7 +191,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 5);
+                _mudarAba(5); 
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -207,7 +229,7 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                setState(() => _abaSelecionada = 5);
+                _mudarAba(5); 
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -215,6 +237,29 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       );
     }
+  }
+
+  void _mudarAba(int indice) {
+    if (_abaSelecionada == indice) return; 
+
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+      _scaffoldKey.currentState?.closeDrawer();
+    }
+
+    setState(() {
+      _abaSelecionada = indice;
+      _isTransitioning = true; 
+    });
+
+    _transitionTimer?.cancel();
+    
+    _transitionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _isTransitioning = false; 
+        });
+      }
+    });
   }
 
   Widget _buildItemMenu(IconData icone, String titulo, int indice, Color accentColor, Color textColor) {
@@ -226,10 +271,100 @@ class _AdminScreenState extends State<AdminScreen> {
       title: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? accentColor : textColor)),
       selected: isSelected,
       selectedTileColor: accentColor.withOpacity(0.15),
-      onTap: () {
-        setState(() => _abaSelecionada = indice);
-        Navigator.pop(context);
-      },
+      onTap: () => _mudarAba(indice), 
+    );
+  }
+
+  Widget _buildAnimatedLoader(Color accentColor, Color bgColor) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: bgColor.withOpacity(0.95), 
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                RotationTransition(
+                  turns: _loaderController,
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [
+                          accentColor.withOpacity(0.1),
+                          accentColor,
+                        ],
+                        stops: const [0.0, 1.0],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: bgColor.withOpacity(0.95),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: _loaderController,
+                  builder: (context, child) {
+                    final scale = 1.0 + (0.05 * (1.0 - (_loaderController.value * 2 - 1).abs()));
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/logo.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withOpacity(0.4),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+          AnimatedBuilder(
+            animation: _loaderController,
+            builder: (context, child) {
+              return Opacity(
+                opacity: 0.5 + (0.5 * (1.0 - (_loaderController.value * 2 - 1).abs())),
+                child: Text(
+                  'CARREGANDO TELA...', 
+                  style: TextStyle(
+                    color: accentColor, 
+                    fontWeight: FontWeight.w900, 
+                    fontSize: 20,
+                    letterSpacing: 3.0,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -259,6 +394,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
       child: Scaffold(
+        key: _scaffoldKey, 
         backgroundColor: bgColor,
         appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].contains(_abaSelecionada)
             ? null 
@@ -329,9 +465,20 @@ class _AdminScreenState extends State<AdminScreen> {
             ],
           ),
         ),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _abas[_abaSelecionada],
+        body: Stack(
+          children: [
+            Container(
+              key: ValueKey('aba_$_abaSelecionada'),
+              child: _abas[_abaSelecionada],
+            ),
+            
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: _isTransitioning
+                  ? _buildAnimatedLoader(accentColor, bgColor)
+                  : const SizedBox.shrink(key: ValueKey('empty')),
+            ),
+          ],
         ),
       ),
     );

@@ -16,7 +16,7 @@ class CatalogoClientePage extends StatefulWidget {
   State<CatalogoClientePage> createState() => _CatalogoClientePageState();
 }
 
-class _CatalogoClientePageState extends State<CatalogoClientePage> {
+class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   Map<String, dynamic>? _catalogo;
   Map<String, dynamic>? _empresa; 
@@ -37,16 +37,23 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
   final TextEditingController _searchController = TextEditingController();
 
   double _pedidoMinimo = 10.0;
+  
+  late AnimationController _loaderController;
 
   @override
   void initState() {
     super.initState();
+    _loaderController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
     _carregarCatalogo();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _loaderController.dispose();
     super.dispose();
   }
 
@@ -604,7 +611,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                                                   child: Center(child: Icon(Icons.arrow_drop_down, size: 36, color: corTema)),
                                                 ),
                                               ),
-                                            ],
+                                            ]
                                           ),
                                         )
                                       ],
@@ -770,7 +777,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                   child: imgUrl == null
                       ? Image.asset('assets/images/logo.jpg', fit: BoxFit.cover, key: ValueKey('asset_$aba'))
                       : imgUrl.startsWith('data:image')
-                          ? Image.memory(base64Decode(imgUrl.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true, key: ValueKey('mem_circle_$aba'))
+                          ? Image.memory(base64Decode(imgUrl.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover, gaplessPlayback: true, key: ValueKey('mem_circle_$aba'))
                           : Image.network(imgUrl, fit: BoxFit.cover, gaplessPlayback: true, key: ValueKey('net_circle_$aba'), errorBuilder: (_, __, ___) => Image.asset('assets/images/logo.jpg', fit: BoxFit.cover)),
                 ),
               ),
@@ -820,10 +827,108 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
     );
   }
 
+  Widget _buildAnimatedLoader(Color accentColor, Color bgColor) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: bgColor.withOpacity(0.95), 
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                RotationTransition(
+                  turns: _loaderController,
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(
+                        colors: [
+                          accentColor.withOpacity(0.1),
+                          accentColor,
+                        ],
+                        stops: const [0.0, 1.0],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: bgColor.withOpacity(0.95),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: _loaderController,
+                  builder: (context, child) {
+                    final scale = 1.0 + (0.05 * (1.0 - (_loaderController.value * 2 - 1).abs()));
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: const DecorationImage(
+                            image: AssetImage('assets/images/logo.jpg'),
+                            fit: BoxFit.cover,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withOpacity(0.4),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+          AnimatedBuilder(
+            animation: _loaderController,
+            builder: (context, child) {
+              return Opacity(
+                opacity: 0.5 + (0.5 * (1.0 - (_loaderController.value * 2 - 1).abs())),
+                child: Text(
+                  'CARREGANDO CATÁLOGO...', 
+                  style: TextStyle(
+                    color: accentColor, 
+                    fontWeight: FontWeight.w900, 
+                    fontSize: 20,
+                    letterSpacing: 3.0,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF4A0E4E))));
+      final corTema = const Color(0xFFE040FB); 
+      final bgColor = const Color(0xFF1E1E2C);
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: _buildAnimatedLoader(corTema, bgColor),
+      );
     }
     if (_catalogo == null) {
       return const Scaffold(body: Center(child: Text('Catálogo não encontrado.')));
@@ -938,7 +1043,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> {
                     children: [
                       if (fotoCapa.isNotEmpty)
                         fotoCapa.startsWith('data:image') 
-                          ? Image.memory(base64Decode(fotoCapa.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_,__,___) => const SizedBox()) 
+                          ? Image.memory(base64Decode(fotoCapa.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_,__,___) => const SizedBox()) 
                           : Image.network(fotoCapa, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_,__,___) => const SizedBox())
                       else
                         Center(child: Icon(Icons.image, size: 80, color: corTema.withOpacity(0.3))),
@@ -1302,7 +1407,7 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
     for (var f in widget.fotos) {
       if (f.startsWith('data:image') && f.contains(',')) {
         try {
-          _cachedBytes.add(base64Decode(f.split(',')[1]));
+          _cachedBytes.add(base64Decode(f.split(',')[1].replaceAll(RegExp(r'\s+'), '')));
         } catch (_) {}
       }
     }
@@ -1342,7 +1447,7 @@ class _CarrosselFotosPublicoWidgetState extends State<CarrosselFotosPublicoWidge
         return Image.memory(_cachedBytes[index], fit: BoxFit.cover, gaplessPlayback: true);
       }
       try {
-        return Image.memory(base64Decode(foto.split(',')[1]), fit: BoxFit.cover, gaplessPlayback: true);
+        return Image.memory(base64Decode(foto.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover, gaplessPlayback: true);
       } catch (_) {
         return Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey));
       }
