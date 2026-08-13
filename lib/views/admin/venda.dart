@@ -283,7 +283,6 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _abrirModalVendaAvulsa() {
-    // 👇 Bloqueio se caixa estiver fechado
     if (!_isCaixaAberto) {
       _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para lançar itens!', Colors.redAccent);
       return;
@@ -377,7 +376,6 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   Future<void> _tentarLancarProduto() async {
-    // 👇 Bloqueio se caixa estiver fechado
     if (!_isCaixaAberto) {
       _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para lançar itens!', Colors.redAccent);
       return;
@@ -1146,7 +1144,6 @@ class _VendaPageState extends State<VendaPage> {
   }
 
   void _finalizarVenda() async {
-    // 👇 Bloqueio se caixa estiver fechado
     if (!_isCaixaAberto) {
       _mensagemPopup('ATENÇÃO: Abra o caixa na aba "Gestão de Caixa" para finalizar!', Colors.redAccent);
       return;
@@ -1663,14 +1660,16 @@ class _VendaPageState extends State<VendaPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!isMobile)
-          Container(
-            width: 130, height: 130,
-            margin: const EdgeInsets.only(bottom: 30, top: 10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)],
-              border: Border.all(color: accentColor, width: 3),
-              image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+          Center(
+            child: Container(
+              width: 110, height: 110,
+              margin: const EdgeInsets.only(bottom: 24, top: 8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 15, spreadRadius: 1)],
+                border: Border.all(color: accentColor, width: 3),
+                image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+              ),
             ),
           ),
         
@@ -1862,7 +1861,7 @@ class _VendaPageState extends State<VendaPage> {
                   ),
                   if (!isMobile)
                     Positioned(
-                      bottom: 120, 
+                      bottom: 180, 
                       right: 40,
                       child: GestureDetector(
                         onTap: () => _mostrarMensagemMascote(showcaseContext),

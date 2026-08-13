@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:acaiteria_front/features/auth/services/empresa_service.dart';
+import 'package:acaiteria_front/features/auth/services/imgbb_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:showcaseview/showcaseview.dart';
 
@@ -30,23 +33,43 @@ class _EmpresaTabState extends State<EmpresaTab> {
   final _horarioController = TextEditingController();
   final _instagramController = TextEditingController();
 
+  String _logoUrl = '';
+  String _mascoteUrl = '';
+  bool _ifoodAtivo = false;
+  bool _promocoesAtivo = true;
+  bool _cuponsAtivo = true;
+
   bool _carregando = true;
   bool _isSalvando = false;
   bool _isDarkMode = true;
+  bool _isUploadingLogo = false;
+  bool _isUploadingMascote = false;
 
   final FlutterTts _flutterTts = FlutterTts();
   final GlobalKey _keyGerais = GlobalKey();
+  final GlobalKey _keyImagens = GlobalKey();
   final GlobalKey _keyRegras = GlobalKey();
   final GlobalKey _keyEndereco = GlobalKey();
 
   final List<String> _textosMascote = [
     "Neste primeiro quadro, você preenche as informações básicas da sua loja, como Nome, CNPJ e os meios de contato para os clientes.",
-    "Aqui é a parte de personalização e regras! Defina o valor mínimo para pedidos, sua chave PIX e a cor que vai estampar seu sistema.",
+    "Aqui você sobe a Logo da sua marca e o Mascote! Eles vão aparecer na tela inicial dos catálogos.",
+    "Aqui ficam as regras e botões do sistema. Altere a cor, ligue ou desligue o botão do iFood, Promoções e Cupons de Desconto.",
     "Por fim, coloque seu endereço completo e os horários de funcionamento. Ah, não esqueça de clicar no botão salvar no final da tela!"
   ];
 
   bool get isDark => _isDarkMode;
-  Color get accentColor => isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+
+  Color _hexToColor(String hex) {
+    if (hex.isEmpty) return isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return isDark ? const Color(0xFFE040FB) : const Color(0xFF4A0E4E);
+    }
+  }
+
+  Color get accentColor => _hexToColor(_corTemaController.text);
   Color get bgColor => isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF4F6F8);
   Color get cardColor => isDark ? const Color(0xFF27293D) : Colors.white;
   Color get textColor => isDark ? Colors.white : Colors.black87;
@@ -57,6 +80,39 @@ class _EmpresaTabState extends State<EmpresaTab> {
     super.initState();
     _flutterTts.setLanguage("pt-BR");
     _carregarDadosEmpresa();
+  }
+
+  ImageProvider _obterLogoProvider() {
+    if (_logoUrl.isNotEmpty) {
+      if (_logoUrl.startsWith('data:image')) {
+        return MemoryImage(base64Decode(_logoUrl.split(',')[1].replaceAll(RegExp(r'\s+'), '')));
+      }
+      return NetworkImage(_logoUrl);
+    }
+    return const AssetImage('assets/images/logo.jpg');
+  }
+
+  Widget _buildMascoteImage(double size) {
+    if (_mascoteUrl.isNotEmpty) {
+      if (_mascoteUrl.startsWith('data:image')) {
+        return Image.memory(
+          base64Decode(_mascoteUrl.split(',')[1].replaceAll(RegExp(r'\s+'), '')),
+          width: size, height: size, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: size, color: accentColor),
+        );
+      } else {
+        return Image.network(
+          _mascoteUrl,
+          width: size, height: size, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: size, color: accentColor),
+        );
+      }
+    }
+    return Image.asset(
+      'assets/images/mascote_acenando.gif',
+      width: size, height: size, fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: size, color: accentColor),
+    );
   }
 
   Future<void> _carregarDadosEmpresa() async {
@@ -80,12 +136,100 @@ class _EmpresaTabState extends State<EmpresaTab> {
         _ufController.text = dados['uf'] ?? '';
         _horarioController.text = dados['horario_funcionamento'] ?? '';
         _instagramController.text = dados['instagram'] ?? '';
+        
+        _logoUrl = dados['logo_url'] ?? '';
+        _mascoteUrl = dados['mascote_url'] ?? '';
+        _ifoodAtivo = dados['ifood_ativo'] ?? false;
+        _promocoesAtivo = dados['promocoes_ativo'] ?? true;
+        _cuponsAtivo = dados['cupons_ativo'] ?? true;
       });
     }
 
     if (mounted) {
       setState(() => _carregando = false);
     }
+  }
+
+  Future<void> _escolherImagem(bool isLogo) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null) {
+      setState(() {
+        if (isLogo) _isUploadingLogo = true;
+        else _isUploadingMascote = true;
+      });
+      try {
+        final bytes = await pickedFile.readAsBytes();
+        final base64 = base64Encode(bytes);
+        final urlHospedada = await ImgbbService.uploadImage(base64);
+        
+        if (urlHospedada != null) {
+          setState(() {
+            if (isLogo) _logoUrl = urlHospedada;
+            else _mascoteUrl = urlHospedada;
+          });
+        } else {
+          final ext = pickedFile.name.toLowerCase().endsWith('.gif') ? 'gif' : 'jpeg';
+          final rawStr = 'data:image/$ext;base64,$base64';
+          setState(() {
+            if (isLogo) _logoUrl = rawStr;
+            else _mascoteUrl = rawStr;
+          });
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falha ao subir imagem.'), backgroundColor: Colors.red));
+      } finally {
+        setState(() {
+          if (isLogo) _isUploadingLogo = false;
+          else _isUploadingMascote = false;
+        });
+      }
+    }
+  }
+
+  void _abrirSeletorDeCor() {
+    final List<Color> cores = [
+      const Color(0xFF4A0E4E), const Color(0xFFE040FB), Colors.purple, Colors.deepPurple,
+      Colors.pink, Colors.red, Colors.orange, Colors.amber,
+      Colors.green, Colors.teal, Colors.blue, Colors.indigo,
+      Colors.blueGrey, Colors.brown, Colors.black, const Color(0xFF151515)
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: cardColor,
+          title: Text('Escolha a Cor Tema', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+          content: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: cores.map((cor) {
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _corTemaController.text = '#${cor.value.toRadixString(16).substring(2).toUpperCase()}';
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: cor, shape: BoxShape.circle, border: Border.all(color: Colors.white24, width: 2)),
+                ),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            )
+          ],
+        );
+      }
+    );
   }
 
   void _salvarConfiguracoes() async {
@@ -110,6 +254,11 @@ class _EmpresaTabState extends State<EmpresaTab> {
       "uf": _ufController.text.trim(),
       "horario_funcionamento": _horarioController.text.trim(),
       "instagram": _instagramController.text.trim(),
+      "logo_url": _logoUrl,
+      "mascote_url": _mascoteUrl,
+      "ifood_ativo": _ifoodAtivo,
+      "promocoes_ativo": _promocoesAtivo,
+      "cupons_ativo": _cuponsAtivo,
     };
 
     bool sucesso = await _empresaService.salvarEmpresa(payload);
@@ -186,11 +335,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                   height: 50,
                   decoration: BoxDecoration(color: accentColor.withOpacity(0.1), shape: BoxShape.circle),
                   child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/mascote_acenando.gif',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(Icons.record_voice_over, color: accentColor),
-                    ),
+                    child: _buildMascoteImage(50),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -264,11 +409,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Image.asset(
-                      'assets/images/mascote_acenando.gif',
-                      width: 100, height: 100, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.sentiment_satisfied_alt, size: 80, color: accentColor),
-                    ),
+                    _buildMascoteImage(100),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Container(
@@ -276,7 +417,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                         decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E2C) : Colors.grey[100], borderRadius: BorderRadius.circular(16)),
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
-                          "Esta é a tela de Configurações da Empresa. Aqui você coloca todos os dados que os clientes vão ver no seu cardápio online.\n\n"
+                          "Esta é a tela de Configurações da Empresa. Aqui você coloca todos os dados e imagens que os clientes vão ver no seu cardápio online.\n\n"
                           "Quer que eu te mostre cada área?",
                           style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
@@ -299,6 +440,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                           Navigator.of(ctx).pop();
                           ShowCaseWidget.of(showcaseContext).startShowCase([
                             _keyGerais,
+                            _keyImagens,
                             _keyRegras,
                             _keyEndereco,
                           ]);
@@ -349,6 +491,59 @@ class _EmpresaTabState extends State<EmpresaTab> {
     );
   }
 
+  Widget _buildUploadArea(String label, String url, bool isUploading, bool isLogo) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: textSecColor, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (url.isNotEmpty)
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 120, height: 120,
+                    margin: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: url.startsWith('data:image') 
+                          ? Image.memory(base64Decode(url.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: textSecColor, size: 40))
+                          : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: textSecColor, size: 40)),
+                    ),
+                  ),
+                  Positioned(
+                    top: -8, right: 8, 
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        if (isLogo) _logoUrl = '';
+                        else _mascoteUrl = '';
+                      }), 
+                      child: Container(padding: const EdgeInsets.all(6), decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 16))
+                    )
+                  ),
+                ],
+              ),
+            if (url.isEmpty)
+              isUploading
+                  ? Container(width: 120, height: 120, decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: accentColor.withOpacity(0.3))), child: Center(child: CircularProgressIndicator(color: accentColor, strokeWidth: 2)))
+                  : InkWell(
+                      onTap: () => _escolherImagem(isLogo),
+                      child: Container(
+                        width: 120, height: 120, 
+                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: accentColor.withOpacity(0.3))), 
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo, color: accentColor, size: 28), const SizedBox(height: 8), Text('Enviar Foto', style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.bold))])
+                      ),
+                    ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_carregando) {
@@ -388,7 +583,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: accentColor, width: 2),
-                    image: const DecorationImage(image: AssetImage('assets/images/logo.jpg'), fit: BoxFit.cover),
+                    image: DecorationImage(image: _obterLogoProvider(), fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -521,8 +716,47 @@ class _EmpresaTabState extends State<EmpresaTab> {
                           const SizedBox(height: 24),
 
                           Showcase.withWidget(
-                            key: _keyRegras,
+                            key: _keyImagens,
                             container: _buildTooltipMascote(showcaseContext, _textosMascote[1], false),
+                            child: Card(
+                              color: cardColor,
+                              elevation: isDark ? 4 : 2,
+                              shadowColor: Colors.black.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.photo_library, color: accentColor, size: 28),
+                                        const SizedBox(width: 12),
+                                        Text('Imagens e Identidade Visual', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
+                                      ],
+                                    ),
+                                    Divider(height: 32, color: isDark ? Colors.white10 : Colors.grey[200]),
+                                    Row(
+                                      children: [
+                                        _buildUploadArea('Logo da Empresa', _logoUrl, _isUploadingLogo, true),
+                                        const SizedBox(width: 32),
+                                        _buildUploadArea('Mascote do Sistema', _mascoteUrl, _isUploadingMascote, false),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          Showcase.withWidget(
+                            key: _keyRegras,
+                            container: _buildTooltipMascote(showcaseContext, _textosMascote[2], false),
                             child: Card(
                               color: cardColor,
                               elevation: isDark ? 4 : 2,
@@ -540,7 +774,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                       children: [
                                         Icon(Icons.tune, color: accentColor, size: 28),
                                         const SizedBox(width: 12),
-                                        Text('Regras do Sistema & Personalização', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
+                                        Text('Regras do Sistema & Configurações', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
                                     Divider(height: 32, color: isDark ? Colors.white10 : Colors.grey[200]),
@@ -565,29 +799,70 @@ class _EmpresaTabState extends State<EmpresaTab> {
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
-                                          child: TextFormField(
-                                            controller: _corTemaController,
-                                            style: TextStyle(color: textColor),
-                                            decoration: InputDecoration(
-                                              labelText: 'Cor Primária (Hex)',
-                                              labelStyle: TextStyle(color: textSecColor),
-                                              hintText: '#4A0E4E',
-                                              hintStyle: TextStyle(color: textSecColor.withOpacity(0.5)),
-                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!),
-                                                borderRadius: BorderRadius.circular(10),
+                                          child: InkWell(
+                                            onTap: _abrirSeletorDeCor,
+                                            child: IgnorePointer(
+                                              child: TextFormField(
+                                                controller: _corTemaController,
+                                                style: TextStyle(color: textColor),
+                                                decoration: InputDecoration(
+                                                  labelText: 'Cor Primária (Hex)',
+                                                  labelStyle: TextStyle(color: textSecColor),
+                                                  hintText: '#4A0E4E',
+                                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  prefixIcon: Icon(Icons.color_lens_outlined, color: accentColor),
+                                                  suffixIcon: Padding(
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    child: Container(
+                                                      decoration: BoxDecoration(color: _hexToColor(_corTemaController.text), shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderSide: BorderSide(color: accentColor, width: 2),
-                                                borderRadius: BorderRadius.circular(10),
-                                              ),
-                                              prefixIcon: Icon(Icons.color_lens_outlined, color: accentColor),
                                             ),
                                           ),
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 24),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!)),
+                                      child: Column(
+                                        children: [
+                                          SwitchListTile(
+                                            title: Text('Botão do iFood no Catálogo', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                            subtitle: Text('Ativa ou desativa o ícone de atalho para o iFood', style: TextStyle(fontSize: 12, color: textSecColor)),
+                                            value: _ifoodAtivo,
+                                            activeColor: Colors.redAccent,
+                                            secondary: const Icon(Icons.delivery_dining, color: Colors.redAccent),
+                                            onChanged: (val) => setState(() => _ifoodAtivo = val),
+                                          ),
+                                          Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
+                                          SwitchListTile(
+                                            title: Text('Sistema de Banners/Promoções', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                            subtitle: Text('Permite mostrar os pop-ups e banners de ofertas aos clientes', style: TextStyle(fontSize: 12, color: textSecColor)),
+                                            value: _promocoesAtivo,
+                                            activeColor: Colors.orange,
+                                            secondary: const Icon(Icons.campaign, color: Colors.orange),
+                                            onChanged: (val) => setState(() => _promocoesAtivo = val),
+                                          ),
+                                          Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
+                                          SwitchListTile(
+                                            title: Text('Aceitar Cupons de Desconto', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                                            subtitle: Text('Mostra o campo para inserir cupons no carrinho', style: TextStyle(fontSize: 12, color: textSecColor)),
+                                            value: _cuponsAtivo,
+                                            activeColor: Colors.green,
+                                            secondary: const Icon(Icons.local_activity, color: Colors.green),
+                                            onChanged: (val) => setState(() => _cuponsAtivo = val),
+                                          ),
+                                        ],
+                                      ),
+                                    )
                                   ],
                                 ),
                               ),
@@ -598,7 +873,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
 
                           Showcase.withWidget(
                             key: _keyEndereco,
-                            container: _buildTooltipMascote(showcaseContext, _textosMascote[2], true),
+                            container: _buildTooltipMascote(showcaseContext, _textosMascote[3], true),
                             child: Card(
                               color: cardColor,
                               elevation: isDark ? 4 : 2,
@@ -744,17 +1019,7 @@ class _EmpresaTabState extends State<EmpresaTab> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(100),
-                      child: Image.asset(
-                        'assets/images/mascote_acenando.gif',
-                        width: 70,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 70, height: 70,
-                          decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
-                          child: const Icon(Icons.help_outline, color: Colors.white, size: 35),
-                        ),
-                      ),
+                      child: _buildMascoteImage(70),
                     ),
                   ),
                 ),

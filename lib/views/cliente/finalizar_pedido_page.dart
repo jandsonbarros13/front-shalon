@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:acaiteria_front/core/constants/api_constants.dart';
 import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
 import 'package:acaiteria_front/features/auth/services/frete_service.dart';
 
@@ -39,10 +40,15 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   final _numeroController = TextEditingController();
   final _referenciaController = TextEditingController();
   final _trocoController = TextEditingController();
+  final _cupomController = TextEditingController();
 
   List<dynamic> _bairrosAtivos = [];
   String? _bairroSelecionado;
   double _taxaEntrega = 0.0;
+
+  double _percentualDesconto = 0.0;
+  String _codigoCupomAplicado = '';
+  bool _isValidandoCupom = false;
 
   String _tipoEntrega = 'Entrega'; 
   String _formaPagamento = 'Pix'; 
@@ -67,11 +73,77 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     _numeroController.dispose();
     _referenciaController.dispose();
     _trocoController.dispose();
+    _cupomController.dispose();
     super.dispose();
   }
 
+  double get _valorDescontoCupom {
+    return widget.valorTotal * (_percentualDesconto / 100);
+  }
+
   double get _valorTotalComFrete {
-    return widget.valorTotal + (_tipoEntrega == 'Entrega' ? _taxaEntrega : 0.0);
+    double subtotalComDesconto = widget.valorTotal - _valorDescontoCupom;
+    return subtotalComDesconto + (_tipoEntrega == 'Entrega' ? _taxaEntrega : 0.0);
+  }
+
+  String get _baseUrl {
+    String url = ApiConstants.baseUrl.trim();
+    if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+    if (url.endsWith('/api')) url = url.substring(0, url.length - 4);
+    return url;
+  }
+
+  Future<void> _validarCupom() async {
+    String codigo = _cupomController.text.trim().toUpperCase();
+    if (codigo.isEmpty) return;
+
+    setState(() => _isValidandoCupom = true);
+
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/api/cupons?codigo=$codigo'));
+      if (response.statusCode == 200) {
+        final cupom = jsonDecode(response.body);
+        
+        List<dynamic> catIds = cupom['catalogos_ids'] ?? [];
+        int idCatalogoAtual = widget.catalogo['id'] ?? widget.catalogo['ID'] ?? 0;
+        
+        if (catIds.isNotEmpty && !catIds.contains(idCatalogoAtual)) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este cupom não é válido para este catálogo.'), backgroundColor: Colors.orange));
+          setState(() {
+            _percentualDesconto = 0.0;
+            _codigoCupomAplicado = '';
+            _isValidandoCupom = false;
+          });
+          return;
+        }
+
+        setState(() {
+          _percentualDesconto = double.tryParse(cupom['percentual_desconto'].toString()) ?? 0.0;
+          _codigoCupomAplicado = codigo;
+          _isValidandoCupom = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cupom de $_percentualDesconto% aplicado com sucesso! 🎉'), backgroundColor: Colors.green));
+      } else {
+        setState(() {
+          _percentualDesconto = 0.0;
+          _codigoCupomAplicado = '';
+          _isValidandoCupom = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cupom inválido ou expirado.'), backgroundColor: Colors.red));
+      }
+    } catch (e) {
+      setState(() => _isValidandoCupom = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao validar o cupom.'), backgroundColor: Colors.red));
+    }
+  }
+
+  void _removerCupom() {
+    setState(() {
+      _percentualDesconto = 0.0;
+      _codigoCupomAplicado = '';
+      _cupomController.clear();
+    });
   }
 
   Future<void> _carregarBairrosEFretes() async {
@@ -319,6 +391,13 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
         <span>R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}</span>
       </div>
       
+      ${_codigoCupomAplicado.isNotEmpty ? '''
+      <div class="taxa" style="color: green;">
+        <span>Desconto ($_codigoCupomAplicado):</span>
+        <span>- R\$ ${_valorDescontoCupom.toStringAsFixed(2).replaceAll('.', ',')}</span>
+      </div>
+      ''' : ''}
+
       <div class="taxa">
         <span>Taxa de Entrega:</span>
         <span>R\$ ${_tipoEntrega == 'Entrega' ? _taxaEntrega.toStringAsFixed(2).replaceAll('.', ',') : '0,00'}</span>
@@ -483,6 +562,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
       'troco_para': double.tryParse(_trocoController.text.replaceAll(',', '.')) ?? 0.0,
       'taxa_entrega': _tipoEntrega == 'Entrega' ? _taxaEntrega : 0.0,
       'valor_total': _valorTotalComFrete,
+      'observacao_interna': _codigoCupomAplicado.isNotEmpty ? 'Cupom Aplicado: $_codigoCupomAplicado (-$_percentualDesconto%)' : '',
       'itens': itensDb,
     };
 
@@ -862,12 +942,74 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
             const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Divider()),
             
             Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _cupomController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: 'Tem cupom de desconto?',
+                      hintStyle: const TextStyle(fontSize: 13),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      prefixIcon: Icon(Icons.local_activity, color: corTema, size: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: corTema,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  onPressed: _isValidandoCupom ? null : _validarCupom,
+                  child: _isValidandoCupom 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Aplicar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            if (_codigoCupomAplicado.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                    const SizedBox(width: 4),
+                    Text('Cupom aplicado: $_codigoCupomAplicado', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                    const Spacer(),
+                    InkWell(
+                      onTap: _removerCupom,
+                      child: const Text('Remover', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12, decoration: TextDecoration.underline)),
+                    )
+                  ],
+                ),
+              ),
+              
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12.0), child: Divider()),
+
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Subtotal dos Itens', style: TextStyle(fontSize: isMobile ? 14 : 16)),
                 Text('R\$ ${widget.valorTotal.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.bold)),
               ],
             ),
+
+            if (_valorDescontoCupom > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Desconto ($_percentualDesconto%)', style: TextStyle(fontSize: isMobile ? 14 : 16, color: Colors.green, fontWeight: FontWeight.bold)),
+                    Text('- R\$ ${_valorDescontoCupom.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                  ],
+                ),
+              ),
+
             if (_tipoEntrega == 'Entrega')
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),

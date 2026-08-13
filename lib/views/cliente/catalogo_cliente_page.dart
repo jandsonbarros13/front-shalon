@@ -18,6 +18,7 @@ class CatalogoClientePage extends StatefulWidget {
 
 class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTickerProviderStateMixin {
   bool _isLoading = true;
+  bool _popupJaMostrado = false;
   Map<String, dynamic>? _catalogo;
   Map<String, dynamic>? _empresa; 
   int? _hoveredIndex;
@@ -25,6 +26,9 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
   final Map<int, double> _carrinho = {};
   final Map<int, String> _observacoes = {};
   final Map<int, List<int>> _adicionaisEscolhidosPorItem = {};
+  
+  final Map<int, double> _precosPromocionaisAtivos = {}; 
+  List<dynamic> _promocoesAtivas = [];
 
   String _categoriaSelecionada = 'Tudo';
   List<String> _abasFiltro = ['Tudo'];
@@ -111,23 +115,52 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           }
         } catch (_) {}
 
-        setState(() {
-          _isLoading = false;
-        });
+        try {
+          final urlPromo = Uri.parse('$urlBaseLimpa/api/promocoes?ativa=true');
+          final resPromo = await http.get(urlPromo);
+          if (resPromo.statusCode == 200) {
+            List<dynamic> todasPromos = jsonDecode(resPromo.body);
+            int idCatalogoAtual = _catalogo!['id'] ?? _catalogo!['ID'] ?? 0;
+            
+            _promocoesAtivas = todasPromos.where((p) {
+              List<dynamic> catsIds = p['catalogos_ids'] ?? [];
+              if (catsIds.isEmpty) return true;
+              return catsIds.contains(idCatalogoAtual);
+            }).toList();
+          }
+        } catch (_) {}
+
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          if (_promocoesAtivas.isNotEmpty && !_popupJaMostrado) {
+            _popupJaMostrado = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _mostrarPopupPromocoesIniciais(
+                _hexToColor(_catalogo!['cor_tema'] ?? '#4A0E4E'), 
+                _hexToColor(_catalogo!['cor_letras'] ?? '#FFFFFF'), 
+                MediaQuery.of(context).size.width < 800
+              );
+            });
+          }
+        }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _atualizarCarrinho(int id, double quantidade, String obs, List<int> adicionaisIds) {
+  void _atualizarCarrinho(int id, double quantidade, String obs, List<int> adicionaisIds, {double? precoPromocional}) {
     setState(() {
       if (quantidade <= 0) {
         _carrinho.remove(id);
         _observacoes.remove(id);
         _adicionaisEscolhidosPorItem.remove(id);
+        _precosPromocionaisAtivos.remove(id);
       } else {
         _carrinho[id] = quantityCalculated(quantidade);
         if (obs.isNotEmpty) {
@@ -140,6 +173,9 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         } else {
           _adicionaisEscolhidosPorItem.remove(id);
         }
+        if (precoPromocional != null) {
+          _precosPromocionaisAtivos[id] = precoPromocional;
+        }
       }
     });
   }
@@ -151,11 +187,20 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
   Future<void> _abrirCarrinho() async {
     if (_carrinho.isEmpty) return;
 
+    Map<String, dynamic> catalogoModificado = jsonDecode(jsonEncode(_catalogo));
+    List<dynamic> prods = catalogoModificado['produtos'];
+    for(var p in prods) {
+      int id = p['id'] ?? p['ID'];
+      if (_precosPromocionaisAtivos.containsKey(id)) {
+        p['price'] = _precosPromocionaisAtivos[id];
+      }
+    }
+
     final pedidoFinalizado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CarrinhoPage(
-          catalogo: _catalogo!,
+          catalogo: catalogoModificado, 
           carrinho: _carrinho,
           observacoes: _observacoes,
           adicionaisEscolhidos: _adicionaisEscolhidosPorItem,
@@ -168,6 +213,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         _carrinho.clear();
         _observacoes.clear();
         _adicionaisEscolhidosPorItem.clear();
+        _precosPromocionaisAtivos.clear();
       });
     } else {
       setState(() {});
@@ -200,7 +246,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         int id = p['id'] ?? p['ID'];
         if (_carrinho.containsKey(id) && _carrinho[id]! > 0) {
           double quantidadeOuPeso = _carrinho[id]!;
-          double precoProduto = double.tryParse(p['price'].toString()) ?? 0.0;
+          
+          double precoProduto = _precosPromocionaisAtivos.containsKey(id) 
+              ? _precosPromocionaisAtivos[id]! 
+              : (double.tryParse(p['price'].toString()) ?? 0.0);
+              
           String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
 
           if (un == 'kg' || un == 'grama' || un == 'g') {
@@ -329,7 +379,229 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
     return null;
   }
 
-  void _mostrarDetalhesProduto(Map<String, dynamic> p, Color corTema, Color corLetras, bool isMobile) {
+  void _mostrarPopupPromocoesIniciais(Color corTema, Color corLetras, bool isMobile) {
+    showDialog(
+      context: context,
+      builder: (ctxPopup) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(isMobile ? 12 : 40),
+          child: Container(
+            width: isMobile ? double.infinity : 800,
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.only(left: 24, right: 8, top: 8, bottom: 8),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.local_fire_department, color: Colors.orange[800], size: isMobile ? 24 : 28),
+                          const SizedBox(width: 8),
+                          Text('OFERTAS PARA VOCÊ!', style: TextStyle(fontWeight: FontWeight.w900, color: corTema, fontSize: isMobile ? 18 : 22)),
+                        ],
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: Colors.grey, size: isMobile ? 24 : 32),
+                        onPressed: () => Navigator.pop(ctxPopup),
+                      )
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _promocoesAtivas.length,
+                    itemBuilder: (context, index) {
+                      final promo = _promocoesAtivas[index];
+                      final img = promo['imagem_url'] ?? '';
+                      Widget imageWidget;
+                      if (img.startsWith('data:image')) {
+                        imageWidget = Image.memory(base64Decode(img.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover);
+                      } else {
+                        imageWidget = Image.network(img, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: corTema.withOpacity(0.2), child: Icon(Icons.campaign, color: corTema, size: 80)));
+                      }
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.pop(ctxPopup); 
+                          _mostrarDetalhesPromocao(promo, corTema, corLetras, isMobile);
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          height: isMobile ? 350 : 500,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              imageWidget,
+                              Positioned(
+                                bottom: 0, left: 0, right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.transparent])
+                                  ),
+                                  child: Text(promo['titulo'] ?? '', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : 24), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                )
+                              )
+                            ]
+                          )
+                        )
+                      );
+                    }
+                  )
+                )
+              ]
+            )
+          )
+        );
+      }
+    );
+  }
+
+  void _mostrarDetalhesPromocao(Map<String, dynamic> promo, Color corTema, Color corLetras, bool isMobile) {
+    List<dynamic> produtosPromo = promo['produtos'] ?? [];
+    final String imgModal = promo['imagem_url'] ?? '';
+
+    List<Map<String, dynamic>> produtosCompletos = [];
+    if (_catalogo != null && _catalogo!['produtos'] != null) {
+      List<dynamic> catalogProducts = _catalogo!['produtos'];
+      for (var pp in produtosPromo) {
+        int prodId = pp['produto_id'];
+        var fullProd = catalogProducts.firstWhere((cp) => (cp['id'] ?? cp['ID']) == prodId, orElse: () => null);
+        if (fullProd != null) {
+          produtosCompletos.add({
+            'produto': fullProd,
+            'preco_promocional': pp['preco_promocional'],
+          });
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (context) => Dialog(
+        insetPadding: isMobile 
+            ? EdgeInsets.zero 
+            : EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.2, vertical: MediaQuery.of(context).size.height * 0.05),
+        shape: isMobile 
+            ? const RoundedRectangleBorder(borderRadius: BorderRadius.zero) 
+            : RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    image: imgModal.isNotEmpty ? DecorationImage(
+                      image: imgModal.startsWith('data') 
+                        ? MemoryImage(base64Decode(imgModal.split(',')[1].replaceAll(RegExp(r'\s+'), ''))) as ImageProvider
+                        : NetworkImage(imgModal),
+                      fit: BoxFit.cover
+                    ) : null,
+                  ),
+                ),
+                Positioned(
+                  top: 16, right: 16,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0, left: 0, right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.transparent])
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(promo['titulo'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                        if ((promo['descricao'] ?? '').toString().isNotEmpty)
+                          Text(promo['descricao'], style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                )
+              ],
+            ),
+            Expanded(
+              child: produtosCompletos.isEmpty 
+                ? const Center(child: Text('Nenhum produto vinculado a esta promoção.'))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: produtosCompletos.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (ctx, idx) {
+                      final item = produtosCompletos[idx];
+                      final p = item['produto'];
+                      final double precoPromo = double.tryParse(item['preco_promocional'].toString()) ?? 0.0;
+                      final double precoOriginal = double.tryParse(p['price'].toString()) ?? 0.0;
+                      final String nome = p['name'] ?? '';
+                      final String imgUrl = (p['image_url'] ?? '').toString();
+                      final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
+
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 50, height: 50,
+                            child: f.isEmpty || f.first == 'null' 
+                              ? Icon(Icons.fastfood, color: Colors.grey[400]) 
+                              : (f.first.startsWith('data:image') ? Image.memory(base64Decode(f.first.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover) : Image.network(f.first, fit: BoxFit.cover))
+                          )
+                        ),
+                        title: Text(nome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: Row(
+                          children: [
+                            Text('R\$ ${precoOriginal.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 12)),
+                            const SizedBox(width: 8),
+                            Text('R\$ ${precoPromo.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 14)),
+                          ],
+                        ),
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: corTema, foregroundColor: corLetras, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                          onPressed: () {
+                            Navigator.pop(context); 
+                            _mostrarDetalhesProduto(p, corTema, corLetras, isMobile, precoPromocionalOverride: precoPromo);
+                          },
+                          child: const Text('Comprar', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      );
+                    },
+                  ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarDetalhesProduto(Map<String, dynamic> p, Color corTema, Color corLetras, bool isMobile, {double? precoPromocionalOverride}) {
     int id = p['id'] ?? p['ID'];
     String un = (p['unidade_medida'] ?? '').toString().toLowerCase();
     bool isUnidadePeso = checkPeso(un);
@@ -373,11 +645,13 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
             int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
             
             double qtdAtual = isUnidadePeso ? (double.tryParse(pesoController.text) ?? 0.0) : quantidadeDesejada;
-            double precoProduto = double.tryParse(p['price'].toString()) ?? 0.0;
+            
+            double precoProdutoNormal = double.tryParse(p['price'].toString()) ?? 0.0;
+            double precoProdutoAtivo = precoPromocionalOverride ?? precoProdutoNormal;
             
             double valorBaseCalculado = isUnidadePeso 
-                ? (qtdAtual > 0 ? (precoProduto / 1000.0) * qtdAtual : precoProduto)
-                : precoProduto * qtdAtual;
+                ? (qtdAtual > 0 ? (precoProdutoAtivo / 1000.0) * qtdAtual : precoProdutoAtivo)
+                : precoProdutoAtivo * qtdAtual;
 
             double custoAdicionais = 0.0;
             List<dynamic> selAds = [];
@@ -443,7 +717,22 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text('Venda por: ${un.toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
+                  
+                  if (precoPromocionalOverride != null)
+                    Row(
+                      children: [
+                        Text('R\$ ${precoProdutoNormal.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('PROMOÇÃO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                        )
+                      ],
+                    )
+                  else
+                    Text('Venda por: ${un.toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
+                  
                   const SizedBox(height: 16),
                   Expanded(
                     child: RawScrollbar(
@@ -702,7 +991,8 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                           ));
                           return;
                         }
-                        _atualizarCarrinho(id, qtdFinal, obsController.text.trim(), adicionaisSelecionadosLocais);
+                        
+                        _atualizarCarrinho(id, qtdFinal, obsController.text.trim(), adicionaisSelecionadosLocais, precoPromocional: precoPromocionalOverride);
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                           content: Text('Adicionado ao carrinho com sucesso! 🛒', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -738,6 +1028,79 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildPromocoesBanner(Color corTema, Color corLetras, bool isMobile) {
+    if (_promocoesAtivas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: isMobile ? 180 : 250,
+      width: double.infinity,
+      color: corTema.withOpacity(0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 24.0, top: 16),
+            child: Row(
+              children: [
+                Icon(Icons.local_fire_department, color: Colors.orange[800], size: 20),
+                const SizedBox(width: 8),
+                Text('PROMOÇÕES ATIVAS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: corTema, letterSpacing: 1.2)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              itemCount: _promocoesAtivas.length,
+              itemBuilder: (context, index) {
+                final promo = _promocoesAtivas[index];
+                final img = promo['imagem_url'] ?? '';
+                
+                Widget imageWidget;
+                if (img.startsWith('data:image')) {
+                  imageWidget = Image.memory(base64Decode(img.split(',')[1].replaceAll(RegExp(r'\s+'), '')), fit: BoxFit.cover);
+                } else {
+                  imageWidget = Image.network(img, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: corTema.withOpacity(0.2), child: Icon(Icons.campaign, color: corTema, size: 50)));
+                }
+
+                return GestureDetector(
+                  onTap: () => _mostrarDetalhesPromocao(promo, corTema, corLetras, isMobile),
+                  child: Container(
+                    width: isMobile ? 280 : 400,
+                    margin: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, spreadRadius: 1)],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        imageWidget,
+                        Positioned(
+                          bottom: 0, left: 0, right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.transparent])
+                            ),
+                            child: Text(promo['titulo'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          )
+                        )
+                      ]
+                    )
+                  )
+                );
+              }
+            )
+          )
+        ],
+      )
     );
   }
 
@@ -1076,6 +1439,9 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                     ],
                   ),
                 ),
+                
+                _buildPromocoesBanner(corTema, corLetras, isMobile),
+
                 if (_isSearching)
                   Center(
                     child: Container(

@@ -13,6 +13,8 @@ import 'admin/catalogo_tab.dart';
 import 'admin/usuarios_tab.dart';
 import 'admin/cadastro_frete_page.dart';
 import 'admin/empresa_tab.dart';
+import 'admin/promocoes_tab.dart';
+import 'admin/cupons_tab.dart'; 
 import 'login_screen.dart';
 import 'package:acaiteria_front/features/auth/services/pedido_service.dart';
 
@@ -47,6 +49,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     'Controle de Produtos',
     'Pedidos da Loja',
     'Catálogo Digital',
+    'Promoções e Banners',
+    'Cupons de Desconto', 
     'Controle de Usuários',
     'Configuração de Frete',
     'Dados da Empresa'
@@ -61,6 +65,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     const ProdutosTab(),
     const PedidosTab(),
     const CatalogoTab(),
+    const PromocoesTab(),
+    const CuponsTab(), 
     const UsuariosTab(),
     const CadastroFretePage(),
     const EmpresaTab(),
@@ -125,17 +131,23 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           }
         }
         
-        if (_isInitialLoad) {
-          _ultimoPedidoConhecido = maiorIdAtual;
-          _isInitialLoad = false;
-          if (quantidadePendentes > 0) {
-            _executarSomEVibracao();
-            _mostrarNotificacaoPendentes(quantidadePendentes);
+        if (mounted) {
+          if (_isInitialLoad) {
+            setState(() {
+              _ultimoPedidoConhecido = maiorIdAtual;
+              _isInitialLoad = false;
+            });
+            if (quantidadePendentes > 0) {
+              _executarSomEVibracao();
+              _mostrarNotificacaoPendentes(quantidadePendentes);
+            }
+          } else if (maiorIdAtual > _ultimoPedidoConhecido) {
+            setState(() {
+              _ultimoPedidoConhecido = maiorIdAtual;
+            });
+            _alertaNovoPedido(maiorIdAtual);
+            _mostrarNotificacaoVisual();
           }
-        } else if (maiorIdAtual > _ultimoPedidoConhecido) {
-          _ultimoPedidoConhecido = maiorIdAtual;
-          _alertaNovoPedido(maiorIdAtual);
-          _mostrarNotificacaoVisual();
         }
       }
     } catch (e) {}
@@ -194,7 +206,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                _mudarAba(6); // Ajustado o índice para Pedidos após a inserção do Caixa
+                _mudarAba(6); 
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -232,7 +244,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white),
               onPressed: () {
                 Navigator.pop(context);
-                _mudarAba(6); // Ajustado o índice para Pedidos após a inserção do Caixa
+                _mudarAba(6); 
               },
               child: const Text('Ver Pedidos', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -399,7 +411,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       child: Scaffold(
         key: _scaffoldKey, 
         backgroundColor: bgColor,
-        appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].contains(_abaSelecionada)
+        appBar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].contains(_abaSelecionada)
             ? null 
             : AppBar(
                 title: Text(_titulos[_abaSelecionada], style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
@@ -441,15 +453,17 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   children: [
                     _buildItemMenu(Icons.dashboard, 'Dashboard', 0, accentColor, textColor),
                     _buildItemMenu(Icons.point_of_sale, 'Vendas (PDV)', 1, accentColor, textColor),
-                    _buildItemMenu(Icons.account_balance_wallet, 'Gestão de Caixa', 2, accentColor, textColor), // Nova Tela Adicionada
+                    _buildItemMenu(Icons.account_balance_wallet, 'Gestão de Caixa', 2, accentColor, textColor), 
                     _buildItemMenu(Icons.history_toggle_off, 'Histórico de Vendas', 3, accentColor, textColor),
                     _buildItemMenu(Icons.category, 'Controle de Tipos/Categorias', 4, accentColor, textColor),
                     _buildItemMenu(Icons.icecream_outlined, 'Controle de Produtos', 5, accentColor, textColor),
                     _buildItemMenu(Icons.list_alt, 'Pedidos da Loja', 6, accentColor, textColor),
                     _buildItemMenu(Icons.auto_stories, 'Catálogo Digital', 7, accentColor, textColor),
-                    _buildItemMenu(Icons.people, 'Controle de Usuários', 8, accentColor, textColor),
-                    _buildItemMenu(Icons.local_shipping, 'Configuração de Frete', 9, accentColor, textColor),
-                    _buildItemMenu(Icons.business, 'Dados da Empresa', 10, accentColor, textColor),
+                    _buildItemMenu(Icons.campaign_outlined, 'Promoções e Banners', 8, accentColor, textColor),
+                    _buildItemMenu(Icons.local_activity, 'Cupons de Desconto', 9, accentColor, textColor), 
+                    _buildItemMenu(Icons.people, 'Controle de Usuários', 10, accentColor, textColor),
+                    _buildItemMenu(Icons.local_shipping, 'Configuração de Frete', 11, accentColor, textColor),
+                    _buildItemMenu(Icons.business, 'Dados da Empresa', 12, accentColor, textColor),
                   ],
                 ),
               ),
