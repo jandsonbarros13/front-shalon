@@ -30,11 +30,13 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   final _estoqueController = TextEditingController();
   final _buscaFiltroController = TextEditingController();
   final _maxAdicionaisGratuitosController = TextEditingController(text: '0');
+  final _maxCremesGratuitosController = TextEditingController(text: '0');
   final ScrollController _scrollAdicionaisCtrl = ScrollController();
 
   List<String> _fotos = [];
   String _unidadeMedida = 'Unidade';
   String _categoria = 'Açai';
+  String _tipoBuscaAtiva = 'Adicionais';
   bool _isSaving = false;
   bool _loadingDados = false; 
   bool _isUploadingImage = false;
@@ -44,6 +46,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
   bool _buscaRealizada = false;
 
   final List<int> _adicionaisSelecionadosIds = [];
+  final List<int> _cremesSelecionadosIds = [];
   final List<int> _produtosComboSelecionadosIds = [];
 
   List<String> _categorias = ['Açai', 'Cremes', 'Adicionais', 'Gelatos', 'Bebidas', 'Combos'];
@@ -56,7 +59,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
 
   final List<String> _textosMascote = [
     "Esta é a tela de Cadastro de Produtos! Preencha o nome, categoria, preço e estoque do seu item.",
-    "Se for um Açaí, Creme ou Combo, você pode pesquisar e selecionar os adicionais aqui. Use as setas laterais para descer a lista se o mouse não estiver ajudando!",
+    "Se for um Açaí, você pode alternar entre pesquisar Adicionais ou Cremes. Use as setas para descer a lista!",
     "Depois de adicionar uma foto bem bonita, clique aqui embaixo em Salvar para colocar o produto no cardápio!"
   ];
 
@@ -91,6 +94,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
         _precoController.text = (p['price'] ?? p['Price'] ?? '').toString();
         _estoqueController.text = (p['estoque'] ?? p['Estoque'] ?? '').toString();
         _maxAdicionaisGratuitosController.text = (p['max_adicionais_gratuitos'] ?? 0).toString();
+        _maxCremesGratuitosController.text = (p['max_cremes_gratuitos'] ?? 0).toString();
         
         String catOriginal = p['category'] ?? p['Category'] ?? 'Açai';
         if (!_categorias.contains(catOriginal) && catOriginal.isNotEmpty) {
@@ -113,6 +117,14 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
           for (var item in p['adicionais_ids']) {
             final val = int.tryParse(item.toString());
             if (val != null) _adicionaisSelecionadosIds.add(val);
+          }
+        }
+
+        _cremesSelecionadosIds.clear();
+        if (p['cremes_ids'] != null) {
+          for (var item in p['cremes_ids']) {
+            final val = int.tryParse(item.toString());
+            if (val != null) _cremesSelecionadosIds.add(val);
           }
         }
         
@@ -168,7 +180,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
         }
       }
     } catch (e) {
-      debugPrint('Erro ao carregar categorias da API: $e');
+      debugPrint('Erro ao carregar categorias: $e');
     }
   }
 
@@ -210,8 +222,10 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     final termo = _buscaFiltroController.text.trim();
     
     String catBusca = '';
-    if (_categoria == 'Açai' || _categoria == 'Cremes') {
-      catBusca = 'Adicionais';
+    if (_categoria == 'Combos') {
+      catBusca = '';
+    } else {
+      catBusca = _tipoBuscaAtiva;
     }
 
     setState(() => _loadingDados = true);
@@ -235,6 +249,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
     _estoqueController.dispose();
     _buscaFiltroController.dispose();
     _maxAdicionaisGratuitosController.dispose();
+    _maxCremesGratuitosController.dispose();
     _scrollAdicionaisCtrl.dispose();
     _flutterTts.stop();
     super.dispose();
@@ -473,10 +488,12 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
       'price': double.tryParse(precoLimpo) ?? 0.0,
       'estoque': int.tryParse(_estoqueController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
       'max_adicionais_gratuitos': int.tryParse(_maxAdicionaisGratuitosController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+      'max_cremes_gratuitos': int.tryParse(_maxCremesGratuitosController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
       'image_url': _fotos.join('|||'),
       'size': '',
       'is_destaque': false,
       'adicionais_ids': (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds : [],
+      'cremes_ids': (_categoria == 'Açai') ? _cremesSelecionadosIds : [],
       'combo_itens_ids': _categoria == 'Combos' ? _produtosComboSelecionadosIds : [],
     };
 
@@ -699,21 +716,43 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                 ),
                                 const SizedBox(height: 16),
                                 if (_categoria == 'Açai' || _categoria == 'Cremes') ...[
-                                  TextFormField(
-                                    controller: _maxAdicionaisGratuitosController,
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-                                    decoration: InputDecoration(
-                                      labelText: 'Qtd. de Adicionais Gratuitos',
-                                      helperText: 'Ex: 3 (Os 3 primeiros são grátis, o 4º em diante cobra o valor do item)',
-                                      helperStyle: TextStyle(color: textSecColor),
-                                      labelStyle: TextStyle(color: textSecColor),
-                                      prefixIcon: Icon(Icons.star_outline, color: accentColor),
-                                      filled: true,
-                                      fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _maxAdicionaisGratuitosController,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                          decoration: InputDecoration(
+                                            labelText: 'Adicionais Grátis',
+                                            labelStyle: TextStyle(color: textSecColor, fontSize: 13),
+                                            prefixIcon: Icon(Icons.star_outline, color: accentColor),
+                                            filled: true,
+                                            fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_categoria == 'Açai') const SizedBox(width: 12),
+                                      if (_categoria == 'Açai')
+                                        Expanded(
+                                          child: TextFormField(
+                                            controller: _maxCremesGratuitosController,
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                                            decoration: InputDecoration(
+                                              labelText: 'Cremes Grátis',
+                                              labelStyle: TextStyle(color: textSecColor, fontSize: 13),
+                                              prefixIcon: Icon(Icons.icecream_outlined, color: accentColor),
+                                              filled: true,
+                                              fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   const SizedBox(height: 16),
                                 ],
@@ -726,8 +765,32 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text((_categoria == 'Açai' || _categoria == 'Cremes') ? 'Pesquisar e Selecionar Adicionais' : 'Pesquisar e Selecionar Itens do Combo', style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Pesquisar e Selecionar', style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
+                                            if (_categoria == 'Açai')
+                                              ToggleButtons(
+                                                borderRadius: BorderRadius.circular(8),
+                                                isSelected: [_tipoBuscaAtiva == 'Adicionais', _tipoBuscaAtiva == 'Cremes'],
+                                                onPressed: (int index) {
+                                                  setState(() {
+                                                    _tipoBuscaAtiva = index == 0 ? 'Adicionais' : 'Cremes';
+                                                    _executarPesquisaAPI();
+                                                  });
+                                                },
+                                                color: textSecColor,
+                                                selectedColor: Colors.white,
+                                                fillColor: accentColor,
+                                                constraints: const BoxConstraints(minHeight: 30, minWidth: 90),
+                                                children: const [
+                                                  Text(' Adicionais ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  Text(' Cremes ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
                                         Row(
                                           children: [
                                             Expanded(
@@ -735,7 +798,7 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                 controller: _buscaFiltroController,
                                                 style: TextStyle(color: textColor),
                                                 decoration: InputDecoration(
-                                                  hintText: 'Digite o nome para buscar...', 
+                                                  hintText: _categoria == 'Combos' ? 'Buscar itens do combo...' : 'Buscar $_tipoBuscaAtiva...', 
                                                   hintStyle: TextStyle(color: textSecColor),
                                                   filled: true,
                                                   fillColor: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F4),
@@ -781,7 +844,16 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                             itemBuilder: (context, index) {
                                                               final item = _resultadosBusca[index];
                                                               final int id = item['id'] ?? item['ID'];
-                                                              final bool sel = (_categoria == 'Açai' || _categoria == 'Cremes') ? _adicionaisSelecionadosIds.contains(id) : _produtosComboSelecionadosIds.contains(id);
+                                                              
+                                                              bool sel = false;
+                                                              if (_categoria == 'Combos') {
+                                                                sel = _produtosComboSelecionadosIds.contains(id);
+                                                              } else if (_tipoBuscaAtiva == 'Cremes') {
+                                                                sel = _cremesSelecionadosIds.contains(id);
+                                                              } else {
+                                                                sel = _adicionaisSelecionadosIds.contains(id);
+                                                              }
+
                                                               final String adNome = item['name'] ?? item['Name'] ?? '';
                                                               final double adPreco = double.tryParse((item['price'] ?? item['Price'] ?? 0).toString()) ?? 0.0;
                                                               final String imgUrl = item['image_url'] ?? item['ImageURL'] ?? '';
@@ -794,10 +866,12 @@ class _CadastroProdutoPageState extends State<CadastroProdutoPage> {
                                                               return InkWell(
                                                                 onTap: () {
                                                                   setState(() {
-                                                                    if (_categoria == 'Açai' || _categoria == 'Cremes') {
-                                                                      sel ? _adicionaisSelecionadosIds.remove(id) : _adicionaisSelecionadosIds.add(id);
-                                                                    } else {
+                                                                    if (_categoria == 'Combos') {
                                                                       sel ? _produtosComboSelecionadosIds.remove(id) : _produtosComboSelecionadosIds.add(id);
+                                                                    } else if (_tipoBuscaAtiva == 'Cremes') {
+                                                                      sel ? _cremesSelecionadosIds.remove(id) : _cremesSelecionadosIds.add(id);
+                                                                    } else {
+                                                                      sel ? _adicionaisSelecionadosIds.remove(id) : _adicionaisSelecionadosIds.add(id);
                                                                     }
                                                                   });
                                                                 },

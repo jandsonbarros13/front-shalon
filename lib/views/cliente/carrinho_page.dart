@@ -7,6 +7,7 @@ class CarrinhoPage extends StatefulWidget {
   final Map<int, double> carrinho;
   final Map<int, String> observacoes;
   final Map<int, List<int>> adicionaisEscolhidos;
+  final Map<int, List<int>> cremesEscolhidos;
 
   const CarrinhoPage({
     super.key,
@@ -14,6 +15,7 @@ class CarrinhoPage extends StatefulWidget {
     required this.carrinho,
     required this.observacoes,
     required this.adicionaisEscolhidos,
+    this.cremesEscolhidos = const {},
   });
 
   @override
@@ -46,10 +48,46 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
 
         if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
           final escolhas = widget.adicionaisEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selAds = [];
           for (var ad in p['adicionais']) {
-            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
+            int count = escolhas.where((e) => e == (ad['id'] ?? ad['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selAds.add(ad);
+            }
+          }
+          selAds.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selAds.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
               total += precoAd * (isPeso ? 1 : qtdOuPeso);
+            }
+          }
+        }
+
+        if (widget.cremesEscolhidos.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+          final escolhas = widget.cremesEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selCremes = [];
+          for (var cr in p['cremes']) {
+            int count = escolhas.where((e) => e == (cr['id'] ?? cr['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selCremes.add(cr);
+            }
+          }
+          selCremes.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selCremes.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+              total += precoCreme * (isPeso ? 1 : qtdOuPeso);
             }
           }
         }
@@ -64,6 +102,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
         widget.carrinho.remove(id);
         widget.observacoes.remove(id);
         widget.adicionaisEscolhidos.remove(id);
+        widget.cremesEscolhidos.remove(id);
         if (widget.carrinho.isEmpty) {
           Navigator.pop(context);
         }
@@ -95,6 +134,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
           carrinho: widget.carrinho,
           observacoes: widget.observacoes,
           adicionaisEscolhidos: widget.adicionaisEscolhidos,
+          cremesEscolhidos: widget.cremesEscolhidos,
           valorTotal: _valorTotal,
         ),
       ),
@@ -174,14 +214,52 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
 
                           double subtotalItem = isPeso ? (preco / 1000.0) * qtdOuPeso : preco * qtdOuPeso;
                           
+                          List<String> nomesCremes = [];
+                          if (widget.cremesEscolhidos.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+                            final escolhas = widget.cremesEscolhidos[id]!;
+                            final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+                            List<dynamic> selCremes = [];
+                            for (var cr in p['cremes']) {
+                              int count = escolhas.where((e) => e == (cr['id'] ?? cr['ID'])).length;
+                              for (int i = 0; i < count; i++) {
+                                selCremes.add(cr);
+                                nomesCremes.add(cr['name'] ?? '');
+                              }
+                            }
+                            selCremes.sort((a, b) {
+                              double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+                              double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+                              return pa.compareTo(pb);
+                            });
+                            for (int i = 0; i < selCremes.length; i++) {
+                              if (i >= maxGratuitos) {
+                                double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+                                subtotalItem += precoCreme * (isPeso ? 1 : qtdOuPeso);
+                              }
+                            }
+                          }
+
                           List<String> nomesAdicionais = [];
                           if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
                             final escolhas = widget.adicionaisEscolhidos[id]!;
+                            final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+                            List<dynamic> selAds = [];
                             for (var ad in p['adicionais']) {
-                              if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-                                double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-                                subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
+                              int count = escolhas.where((e) => e == (ad['id'] ?? ad['ID'])).length;
+                              for (int i = 0; i < count; i++) {
+                                selAds.add(ad);
                                 nomesAdicionais.add(ad['name'] ?? '');
+                              }
+                            }
+                            selAds.sort((a, b) {
+                              double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+                              double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+                              return pa.compareTo(pb);
+                            });
+                            for (int i = 0; i < selAds.length; i++) {
+                              if (i >= maxGratuitos) {
+                                double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
+                                subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
                               }
                             }
                           }
@@ -217,10 +295,15 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                                           Text(p['name'], style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: corTema), maxLines: 2, overflow: TextOverflow.ellipsis),
                                           const SizedBox(height: 4),
                                           Text(isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.bold)),
+                                          if (nomesCremes.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2.0),
+                                              child: Text('🍦 Cremes: ${nomesCremes.join(", ")}', style: TextStyle(color: corTema, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
                                           if (nomesAdicionais.isNotEmpty)
                                             Padding(
                                               padding: const EdgeInsets.only(top: 2.0),
-                                              child: Text('+ ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 12, fontWeight: FontWeight.bold)),
+                                              child: Text('+ Adicionais: ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 12, fontWeight: FontWeight.bold)),
                                             ),
                                           const SizedBox(height: 4),
                                           Text('R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
@@ -288,10 +371,15 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                                     Text(p['name'], style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: corTema)),
                                     const SizedBox(height: 4),
                                     Text(isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)', style: TextStyle(color: Colors.grey[600], fontSize: 14, fontWeight: FontWeight.bold)),
+                                    if (nomesCremes.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text('🍦 Cremes: ${nomesCremes.join(", ")}', style: TextStyle(color: corTema, fontSize: 13, fontWeight: FontWeight.bold)),
+                                      ),
                                     if (nomesAdicionais.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4.0),
-                                        child: Text('+ ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 13, fontWeight: FontWeight.bold)),
+                                        child: Text('+ Adicionais: ${nomesAdicionais.join(", ")}', style: TextStyle(color: Colors.orange[800], fontSize: 13, fontWeight: FontWeight.bold)),
                                       ),
                                     if (obs.isNotEmpty)
                                       Padding(padding: const EdgeInsets.only(top: 8.0), child: Text('📝 Obs: $obs', style: TextStyle(color: Colors.purple[700], fontSize: 13, fontStyle: FontStyle.italic))),

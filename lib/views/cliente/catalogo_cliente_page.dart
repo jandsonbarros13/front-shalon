@@ -26,6 +26,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
   final Map<int, double> _carrinho = {};
   final Map<int, String> _observacoes = {};
   final Map<int, List<int>> _adicionaisEscolhidosPorItem = {};
+  final Map<int, List<int>> _cremesEscolhidosPorItem = {};
   
   final Map<int, double> _precosPromocionaisAtivos = {}; 
   List<dynamic> _promocoesAtivas = [];
@@ -154,12 +155,13 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
     }
   }
 
-  void _atualizarCarrinho(int id, double quantidade, String obs, List<int> adicionaisIds, {double? precoPromocional}) {
+  void _atualizarCarrinho(int id, double quantidade, String obs, List<int> adicionaisIds, List<int> cremesIds, {double? precoPromocional}) {
     setState(() {
       if (quantidade <= 0) {
         _carrinho.remove(id);
         _observacoes.remove(id);
         _adicionaisEscolhidosPorItem.remove(id);
+        _cremesEscolhidosPorItem.remove(id);
         _precosPromocionaisAtivos.remove(id);
       } else {
         _carrinho[id] = quantityCalculated(quantidade);
@@ -172,6 +174,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           _adicionaisEscolhidosPorItem[id] = List.from(adicionaisIds);
         } else {
           _adicionaisEscolhidosPorItem.remove(id);
+        }
+        if (cremesIds.isNotEmpty) {
+          _cremesEscolhidosPorItem[id] = List.from(cremesIds);
+        } else {
+          _cremesEscolhidosPorItem.remove(id);
         }
         if (precoPromocional != null) {
           _precosPromocionaisAtivos[id] = precoPromocional;
@@ -213,6 +220,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         _carrinho.clear();
         _observacoes.clear();
         _adicionaisEscolhidosPorItem.clear();
+        _cremesEscolhidosPorItem.clear();
         _precosPromocionaisAtivos.clear();
       });
     } else {
@@ -282,6 +290,33 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
               if (i >= maxGratuitos) {
                 double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
                 total += precoAd * (checkPeso(un) ? 1 : quantityCalculated(quantidadeOuPeso));
+              }
+            }
+          }
+
+          if (_cremesEscolhidosPorItem.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+            final escolhas = _cremesEscolhidosPorItem[id]!;
+            final List<dynamic> cremesDoBd = p['cremes'];
+            final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+            
+            List<dynamic> selCremes = [];
+            for (var creme in cremesDoBd) {
+              int count = escolhas.where((e) => e == (creme['id'] ?? creme['ID'])).length;
+              for (int i = 0; i < count; i++) {
+                selCremes.add(creme);
+              }
+            }
+            
+            selCremes.sort((a, b) {
+              double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+              double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+              return pa.compareTo(pb);
+            });
+            
+            for (int i = 0; i < selCremes.length; i++) {
+              if (i >= maxGratuitos) {
+                double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+                total += precoCreme * (checkPeso(un) ? 1 : quantityCalculated(quantidadeOuPeso));
               }
             }
           }
@@ -614,19 +649,10 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
     List<dynamic> adicionaisDoProduto = p['adicionais'] ?? [];
     List<int> adicionaisSelecionadosLocais = List.from(_adicionaisEscolhidosPorItem[id] ?? []);
 
-    final ScrollController scrollControllerGeral = ScrollController();
-    final ScrollController scrollControllerAdicionais = ScrollController();
+    List<dynamic> cremesDoProduto = p['cremes'] ?? [];
+    List<int> cremesSelecionadosLocais = List.from(_cremesEscolhidosPorItem[id] ?? []);
 
-    void scrollVertical(double offset) {
-      if (scrollControllerAdicionais.hasClients) {
-        final target = scrollControllerAdicionais.offset + offset;
-        scrollControllerAdicionais.animateTo(
-          target.clamp(0.0, scrollControllerAdicionais.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    }
+    final ScrollController scrollControllerGeral = ScrollController();
 
     showDialog(
       context: context,
@@ -642,7 +668,8 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         child: StatefulBuilder(
           builder: (context, setModalState) {
             
-            int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+            int maxAdicionaisGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+            int maxCremesGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
             
             double qtdAtual = isUnidadePeso ? (double.tryParse(pesoController.text) ?? 0.0) : quantidadeDesejada;
             
@@ -653,13 +680,13 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                 ? (qtdAtual > 0 ? (precoProdutoAtivo / 1000.0) * qtdAtual : precoProdutoAtivo)
                 : precoProdutoAtivo * qtdAtual;
 
-            double custoAdicionais = 0.0;
+            double custoAdicionaisECremes = 0.0;
+            
             List<dynamic> selAds = [];
             for (var adId in adicionaisSelecionadosLocais) {
               var ad = adicionaisDoProduto.firstWhere((a) => (a['id'] ?? a['ID']) == adId, orElse: () => null);
               if (ad != null) selAds.add(ad);
             }
-            
             selAds.sort((a, b) {
               double pa = double.tryParse(a['price'].toString()) ?? 0.0;
               double pb = double.tryParse(b['price'].toString()) ?? 0.0;
@@ -667,13 +694,31 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
             });
 
             for (int i = 0; i < selAds.length; i++) {
-              if (i >= maxGratuitos) {
+              if (i >= maxAdicionaisGratuitos) {
                 double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
-                custoAdicionais += precoAd * (isUnidadePeso ? 1 : qtdAtual);
+                custoAdicionaisECremes += precoAd * (isUnidadePeso ? 1 : qtdAtual);
+              }
+            }
+
+            List<dynamic> selCremes = [];
+            for (var cremeId in cremesSelecionadosLocais) {
+              var cr = cremesDoProduto.firstWhere((c) => (c['id'] ?? c['ID']) == cremeId, orElse: () => null);
+              if (cr != null) selCremes.add(cr);
+            }
+            selCremes.sort((a, b) {
+              double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+              double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+              return pa.compareTo(pb);
+            });
+
+            for (int i = 0; i < selCremes.length; i++) {
+              if (i >= maxCremesGratuitos) {
+                double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+                custoAdicionaisECremes += precoCreme * (isUnidadePeso ? 1 : qtdAtual);
               }
             }
             
-            double totalFinalExibido = valorBaseCalculado + custoAdicionais;
+            double totalFinalExibido = valorBaseCalculado + custoAdicionaisECremes;
             final String imgModal = (p['image_url'] ?? '').toString();
 
             final Widget imagemDestaque = Stack(
@@ -698,6 +743,118 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
               ],
             );
 
+            Widget buildListaExtras(String titulo, IconData icone, List<dynamic> itens, List<int> selecionados, int maxFree) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(icone, color: corTema, size: 20),
+                            const SizedBox(width: 8),
+                            Text(titulo, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
+                          ],
+                        ),
+                        if (maxFree > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6.0, left: 28.0),
+                            child: Text('Escolha até $maxFree opções grátis.', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  itens.isEmpty
+                    ? Text('Nenhum item vinculado.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: itens.length,
+                        separatorBuilder: (context, index) => const Divider(height: 16),
+                        itemBuilder: (context, index) {
+                          final item = itens[index];
+                          final int itemId = item['id'] ?? item['ID'];
+                          final String itemNome = item['name'] ?? '';
+                          final double itemPreco = double.tryParse(item['price'].toString()) ?? 0.0;
+                          final String imgUrl = item['image_url'] ?? '';
+                          final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
+
+                          final int qtdSelecionada = selecionados.where((e) => e == itemId).length;
+                          bool isFree = itemPreco == 0.0 || (selecionados.length < maxFree);
+                          String textoPreco = isFree ? '+R\$ 0,00' : '+R\$ ${itemPreco.toStringAsFixed(2).replaceAll('.', ',')}';
+
+                          return Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 50, height: 50,
+                                  child: f.isEmpty || f.first == 'null'
+                                      ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
+                                      : CarrosselFotosPublicoWidget(key: ValueKey('extra_modal_$itemId'), fotos: f)
+                                )
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(itemNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    Text(textoPreco, style: TextStyle(color: isFree ? Colors.green[700] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    InkWell(
+                                      onTap: qtdSelecionada > 0 ? () {
+                                        setModalState(() { selecionados.remove(itemId); });
+                                      } : null,
+                                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        child: Icon(Icons.remove, size: 18, color: qtdSelecionada > 0 ? Colors.red : Colors.grey[400]),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 24,
+                                      child: Text('$qtdSelecionada', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: qtdSelecionada > 0 ? corTema : Colors.grey)),
+                                    ),
+                                    InkWell(
+                                      onTap: () {
+                                        setModalState(() { selecionados.add(itemId); });
+                                      },
+                                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        child: Icon(Icons.add, size: 18, color: corTema),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                  const SizedBox(height: 16),
+                ],
+              );
+            }
+
             Widget buildConteudoModal() {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,7 +873,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   
                   if (precoPromocionalOverride != null)
                     Row(
@@ -733,7 +890,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                   else
                     Text('Venda por: ${un.toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: RawScrollbar(
                       controller: scrollControllerGeral,
@@ -750,170 +907,27 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                             Container(
                               height: 250,
                               width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 16),
+                              margin: const EdgeInsets.only(bottom: 8),
                               clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
                               child: imagemDestaque,
                             ),
-                          Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
+                          if ((p['description'] ?? '').toString().trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
+                            ),
                           
                           if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
-                            const SizedBox(height: 24),
-                            Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(categoria == 'Combos' ? Icons.inventory_2_outlined : Icons.add_circle_outline, color: corTema, size: 20),
-                                          const SizedBox(width: 8),
-                                          Text(categoria == 'Combos' ? 'ITENS INCLUSOS' : 'ADICIONAIS E RECHEIOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: corTema, letterSpacing: 0.5)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  if (maxGratuitos > 0)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6.0, left: 28.0),
-                                      child: Text('Escolha até $maxGratuitos opções grátis.', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 13)),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            adicionaisDoProduto.isEmpty
-                                ? const Text('Nenhum item adicional vinculado a este produto.', style: TextStyle(color: Colors.grey, fontSize: 14, fontStyle: FontStyle.italic))
-                                : Container(
-                                    height: 280,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[200]!),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: RawScrollbar(
-                                            controller: scrollControllerAdicionais,
-                                            thumbVisibility: false,
-                                            child: ListView.separated(
-                                              controller: scrollControllerAdicionais,
-                                              padding: const EdgeInsets.only(left: 12, right: 12, top: 12, bottom: 12), 
-                                              scrollDirection: Axis.vertical,
-                                              physics: const BouncingScrollPhysics(),
-                                              itemCount: adicionaisDoProduto.length,
-                                              separatorBuilder: (context, index) => const Divider(height: 16),
-                                              itemBuilder: (context, index) {
-                                                final ad = adicionaisDoProduto[index];
-                                                final int adId = ad['id'] ?? ad['ID'];
-                                                final String adNome = ad['name'] ?? '';
-                                                final double adPreco = double.tryParse(ad['price'].toString()) ?? 0.0;
-                                                final String imgUrl = ad['image_url'] ?? '';
-                                                final List<String> f = imgUrl.split('|||').where((s) => s.isNotEmpty).toList();
-
-                                                final int qtdSelecionada = adicionaisSelecionadosLocais.where((e) => e == adId).length;
-
-                                                bool isFree = adPreco == 0.0 || (adicionaisSelecionadosLocais.length < maxGratuitos);
-                                                String textoPreco = isFree ? '+R\$ 0,00' : '+R\$ ${adPreco.toStringAsFixed(2).replaceAll('.', ',')}';
-
-                                                return Row(
-                                                  children: [
-                                                    ClipRRect(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      child: SizedBox(
-                                                        width: 50, height: 50,
-                                                        child: f.isEmpty || f.first == 'null'
-                                                            ? Container(color: Colors.grey[200], child: Icon(Icons.fastfood, color: Colors.grey[400]))
-                                                            : CarrosselFotosPublicoWidget(key: ValueKey('ad_modal_$adId'), fotos: f)
-                                                      )
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(adNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                                          const SizedBox(height: 4),
-                                                          Text(textoPreco, style: TextStyle(color: isFree ? Colors.green[700] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      decoration: BoxDecoration(
-                                                        border: Border.all(color: Colors.grey[300]!),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        color: Colors.white,
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          InkWell(
-                                                            onTap: qtdSelecionada > 0 ? () {
-                                                              setModalState(() { adicionaisSelecionadosLocais.remove(adId); });
-                                                            } : null,
-                                                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                              child: Icon(Icons.remove, size: 18, color: qtdSelecionada > 0 ? Colors.red : Colors.grey[400]),
-                                                            ),
-                                                          ),
-                                                          SizedBox(
-                                                            width: 24,
-                                                            child: Text('$qtdSelecionada', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: qtdSelecionada > 0 ? corTema : Colors.grey)),
-                                                          ),
-                                                          InkWell(
-                                                            onTap: () {
-                                                              setModalState(() { adicionaisSelecionadosLocais.add(adId); });
-                                                            },
-                                                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                                                            child: Padding(
-                                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                              child: Icon(Icons.add, size: 18, color: corTema),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 28,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[50],
-                                            border: Border(left: BorderSide(color: Colors.grey[200]!)),
-                                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(12))
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              Expanded(
-                                                child: InkWell(
-                                                  onTap: () => scrollVertical(-200),
-                                                  child: Center(child: Icon(Icons.arrow_drop_up, size: 20, color: corTema)),
-                                                ),
-                                              ),
-                                              const Divider(height: 1),
-                                              Expanded(
-                                                child: InkWell(
-                                                  onTap: () => scrollVertical(200),
-                                                  child: Center(child: Icon(Icons.arrow_drop_down, size: 20, color: corTema)),
-                                                ),
-                                              ),
-                                            ]
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
+                            const SizedBox(height: 8),
+                            
+                            if (cremesDoProduto.isNotEmpty)
+                              buildListaExtras('ESCOLHA SEUS CREMES', Icons.icecream_outlined, cremesDoProduto, cremesSelecionadosLocais, maxCremesGratuitos),
+                            
+                            if (adicionaisDoProduto.isNotEmpty)
+                              buildListaExtras('ADICIONAIS E RECHEIOS', Icons.add_circle_outline, adicionaisDoProduto, adicionaisSelecionadosLocais, maxAdicionaisGratuitos),
                           ],
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 12),
                           const Text('OBSERVAÇÕES (OPCIONAL):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87)),
                           const SizedBox(height: 8),
                           TextField(
@@ -992,7 +1006,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                           return;
                         }
                         
-                        _atualizarCarrinho(id, qtdFinal, obsController.text.trim(), adicionaisSelecionadosLocais, precoPromocional: precoPromocionalOverride);
+                        _atualizarCarrinho(id, qtdFinal, obsController.text.trim(), adicionaisSelecionadosLocais, cremesSelecionadosLocais, precoPromocional: precoPromocionalOverride);
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                           content: Text('Adicionado ao carrinho com sucesso! 🛒', style: TextStyle(fontWeight: FontWeight.bold)),

@@ -13,6 +13,7 @@ class FinalizarPedidoPage extends StatefulWidget {
   final Map<int, double> carrinho;
   final Map<int, String> observacoes;
   final Map<int, List<int>> adicionaisEscolhidos;
+  final Map<int, List<int>> cremesEscolhidos;
   final double valorTotal;
 
   const FinalizarPedidoPage({
@@ -21,6 +22,7 @@ class FinalizarPedidoPage extends StatefulWidget {
     required this.carrinho,
     required this.observacoes,
     required this.adicionaisEscolhidos,
+    this.cremesEscolhidos = const {},
     required this.valorTotal,
   });
 
@@ -299,15 +301,57 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
         
         double subtotalItem = isPeso ? (preco / 1000.0) * qtd : preco * qtd;
 
+        String nomeCremesFormatados = '';
+        if (widget.cremesEscolhidos.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+          final escolhas = widget.cremesEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selCremes = [];
+          List<String> nomesCremes = [];
+          for (var cr in p['cremes']) {
+            int count = escolhas.where((e) => e == (cr['id'] ?? cr['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selCremes.add(cr);
+              nomesCremes.add(cr['name'] ?? '');
+            }
+          }
+          selCremes.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selCremes.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+              subtotalItem += precoCreme * (isPeso ? 1 : qtd);
+            }
+          }
+          if (nomesCremes.isNotEmpty) {
+            nomeCremesFormatados = ' [🍦 Cremes: ${nomesCremes.join(', ')}]';
+          }
+        }
+
         String nomeAdicionaisFormatados = '';
         if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
           final escolhas = widget.adicionaisEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selAds = [];
           List<String> nomesAds = [];
           for (var ad in p['adicionais']) {
-            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-              subtotalItem += precoAd * (isPeso ? 1 : qtd);
+            int count = escolhas.where((e) => e == (ad['id'] ?? ad['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selAds.add(ad);
               nomesAds.add(ad['name'] ?? '');
+            }
+          }
+          selAds.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selAds.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
+              subtotalItem += precoAd * (isPeso ? 1 : qtd);
             }
           }
           if (nomesAds.isNotEmpty) {
@@ -318,7 +362,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
         String qtdText = isPeso ? '${qtd.toInt()}g' : '${qtd.toInt()} un';
         htmlItens += '''
           <div class="item">
-            <span>$qtdText x ${p['name']} $nomeAdicionaisFormatados</span>
+            <span>$qtdText x ${p['name']} $nomeCremesFormatados $nomeAdicionaisFormatados</span>
             <span>R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}</span>
           </div>
         ''';
@@ -524,15 +568,57 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
         
         double subtotalItem = isPeso ? (preco / 1000.0) * qtd : preco * qtd;
 
+        String nomeCremesFormatados = '';
+        if (widget.cremesEscolhidos.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+          final escolhas = widget.cremesEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selCremes = [];
+          List<String> nomesCremes = [];
+          for (var cr in p['cremes']) {
+            int count = escolhas.where((e) => e == (cr['id'] ?? cr['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selCremes.add(cr);
+              nomesCremes.add(cr['name'] ?? '');
+            }
+          }
+          selCremes.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selCremes.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+              subtotalItem += precoCreme * (isPeso ? 1 : qtd);
+            }
+          }
+          if (nomesCremes.isNotEmpty) {
+            nomeCremesFormatados = ' [🍦 Cremes: ${nomesCremes.join(', ')}]';
+          }
+        }
+
         String nomeAdicionaisFormatados = '';
         if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
           final escolhas = widget.adicionaisEscolhidos[id]!;
+          final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+          List<dynamic> selAds = [];
           List<String> nomesAds = [];
           for (var ad in p['adicionais']) {
-            if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-              double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-              subtotalItem += precoAd * (isPeso ? 1 : qtd);
+            int count = escolhas.where((e) => e == (ad['id'] ?? ad['ID'])).length;
+            for (int i = 0; i < count; i++) {
+              selAds.add(ad);
               nomesAds.add(ad['name'] ?? '');
+            }
+          }
+          selAds.sort((a, b) {
+            double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+            double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+            return pa.compareTo(pb);
+          });
+          for (int i = 0; i < selAds.length; i++) {
+            if (i >= maxGratuitos) {
+              double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
+              subtotalItem += precoAd * (isPeso ? 1 : qtd);
             }
           }
           if (nomesAds.isNotEmpty) {
@@ -545,7 +631,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
           'quantidade': qtd,
           'subtotal': subtotalItem,
           'unidade': un,
-          'nome': (p['name'] ?? '') + nomeAdicionaisFormatados + (obs.isNotEmpty ? ' (Obs: $obs)' : ''),
+          'nome': (p['name'] ?? '') + nomeCremesFormatados + nomeAdicionaisFormatados + (obs.isNotEmpty ? ' (Obs: $obs)' : ''),
         });
       }
     }
@@ -896,14 +982,52 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
 
                 double subtotalItem = isPeso ? (preco / 1000.0) * qtdOuPeso : preco * qtdOuPeso;
 
+                List<String> nomesCremes = [];
+                if (widget.cremesEscolhidos.containsKey(id) && p['cremes'] != null && p['cremes'] is List) {
+                  final escolhas = widget.cremesEscolhidos[id]!;
+                  final int maxGratuitos = int.tryParse(p['max_cremes_gratuitos']?.toString() ?? '0') ?? 0;
+                  List<dynamic> selCremes = [];
+                  for (var cr in p['cremes']) {
+                    int count = escolhas.where((e) => e == (cr['id'] ?? cr['ID'])).length;
+                    for (int i = 0; i < count; i++) {
+                      selCremes.add(cr);
+                      nomesCremes.add(cr['name'] ?? '');
+                    }
+                  }
+                  selCremes.sort((a, b) {
+                    double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+                    double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+                    return pa.compareTo(pb);
+                  });
+                  for (int i = 0; i < selCremes.length; i++) {
+                    if (i >= maxGratuitos) {
+                      double precoCreme = double.tryParse(selCremes[i]['price'].toString()) ?? 0.0;
+                      subtotalItem += precoCreme * (isPeso ? 1 : qtdOuPeso);
+                    }
+                  }
+                }
+
                 List<String> nomesAdicionais = [];
                 if (widget.adicionaisEscolhidos.containsKey(id) && p['adicionais'] != null && p['adicionais'] is List) {
                   final escolhas = widget.adicionaisEscolhidos[id]!;
+                  final int maxGratuitos = int.tryParse(p['max_adicionais_gratuitos']?.toString() ?? '0') ?? 0;
+                  List<dynamic> selAds = [];
                   for (var ad in p['adicionais']) {
-                    if (escolhas.contains(ad['id'] ?? ad['ID'])) {
-                      double precoAd = double.tryParse(ad['price'].toString()) ?? 0.0;
-                      subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
+                    int count = escolhas.where((e) => e == (ad['id'] ?? ad['ID'])).length;
+                    for (int i = 0; i < count; i++) {
+                      selAds.add(ad);
                       nomesAdicionais.add(ad['name'] ?? '');
+                    }
+                  }
+                  selAds.sort((a, b) {
+                    double pa = double.tryParse(a['price'].toString()) ?? 0.0;
+                    double pb = double.tryParse(b['price'].toString()) ?? 0.0;
+                    return pa.compareTo(pb);
+                  });
+                  for (int i = 0; i < selAds.length; i++) {
+                    if (i >= maxGratuitos) {
+                      double precoAd = double.tryParse(selAds[i]['price'].toString()) ?? 0.0;
+                      subtotalItem += precoAd * (isPeso ? 1 : qtdOuPeso);
                     }
                   }
                 }
@@ -922,6 +1046,11 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
                               isPeso ? '${qtdOuPeso.toInt()}g' : '${qtdOuPeso.toInt()} unidade(s)',
                               style: const TextStyle(color: Colors.grey, fontSize: 13),
                             ),
+                            if (nomesCremes.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text('🍦 ${nomesCremes.join(", ")}', style: TextStyle(color: corTema, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
                             if (nomesAdicionais.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2.0),
