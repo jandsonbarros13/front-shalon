@@ -21,7 +21,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
   final GlobalKey _keyNovo = GlobalKey();
 
   final List<String> _textosMascote = [
-    "Aqui você gerencia todas as categorias do seu cardápio, como Açaí, Bebidas e Adicionais. Você pode editar ou excluir clicando nos ícones ao lado.",
+    "Aqui você gerencia todas as categorias do seu cardápio, como Açaí, Bebidas e Adicionais. Você pode arrastar as categorias para mudar a ordem delas, ou editar e excluir clicando nos ícones.",
     "E para criar uma nova categoria, é só clicar neste botão de Nova Categoria!"
   ];
 
@@ -53,6 +53,34 @@ class _CategoriasTabState extends State<CategoriasTab> {
         _categorias = lista;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _salvarNovaOrdem() async {
+    try {
+      List<int> idsOrdenados = _categorias.map((c) => c['id'] as int).toList();
+      
+      await _categoriaService.atualizarOrdem(idsOrdenados);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ordem atualizada com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar a nova ordem.', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -178,6 +206,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                         child: Text(
                           "Olá! Sou o mascote da Açaiteria Shalom! 🍇\n\n"
                           "Esta é a tela de Categorias. Aqui você organiza seu cardápio criando seções como 'Açaí', 'Bebidas' ou 'Adicionais'.\n\n"
+                          "Dica: Você pode segurar e arrastar uma categoria para mudar a ordem em que ela aparece para o cliente!\n\n"
                           "Quer fazer um Tour Guiado para ver como funciona?",
                           style: TextStyle(fontSize: 14, color: textSecColor, height: 1.5, fontWeight: FontWeight.w500),
                         ),
@@ -421,7 +450,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                         children: [
                           Text('Gerenciamento de Tipos / Categorias', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor)),
                           const SizedBox(height: 8),
-                          Text('Crie ou edite as categorias que aparecerão no catálogo e nos filtros de pesquisa.', style: TextStyle(color: textSecColor, fontSize: 15)),
+                          Text('Arraste as categorias para cima ou para baixo para alterar a ordem em que elas aparecem no catálogo.', style: TextStyle(color: textSecColor, fontSize: 15)),
                           const SizedBox(height: 30),
                           Expanded(
                             child: _categorias.isEmpty
@@ -446,37 +475,66 @@ class _CategoriasTabState extends State<CategoriasTab> {
                                         borderRadius: BorderRadius.circular(16),
                                         side: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
                                       ),
-                                      child: ListView.separated(
+                                      child: ReorderableListView.builder(
+                                        buildDefaultDragHandles: false,
                                         itemCount: _categorias.length,
-                                        separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[200]),
+                                        onReorder: (oldIndex, newIndex) {
+                                          setState(() {
+                                            if (newIndex > oldIndex) {
+                                              newIndex -= 1;
+                                            }
+                                            final item = _categorias.removeAt(oldIndex);
+                                            _categorias.insert(newIndex, item);
+                                          });
+                                          _salvarNovaOrdem();
+                                        },
                                         itemBuilder: (context, index) {
                                           final cat = _categorias[index];
-                                          return ListTile(
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                            leading: Container(
-                                              width: 48, height: 48,
-                                              decoration: BoxDecoration(
-                                                color: accentColor.withOpacity(0.15),
-                                                borderRadius: BorderRadius.circular(12)
+                                          return Container(
+                                            key: ValueKey(cat['id']),
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey[200]!)
                                               ),
-                                              child: Icon(Icons.category, color: accentColor),
+                                              color: cardColor,
                                             ),
-                                            title: Text(cat['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
-                                            trailing: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                                  tooltip: 'Editar',
-                                                  onPressed: () => _abrirModalCategoria(categoria: cat),
+                                            child: ReorderableDragStartListener(
+                                              index: index,
+                                              child: ListTile(
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                leading: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.drag_indicator, color: textSecColor),
+                                                    const SizedBox(width: 16),
+                                                    Container(
+                                                      width: 48, height: 48,
+                                                      decoration: BoxDecoration(
+                                                        color: accentColor.withOpacity(0.15),
+                                                        borderRadius: BorderRadius.circular(12)
+                                                      ),
+                                                      child: Icon(Icons.category, color: accentColor),
+                                                    ),
+                                                  ],
                                                 ),
-                                                const SizedBox(width: 8),
-                                                IconButton(
-                                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                                  tooltip: 'Excluir',
-                                                  onPressed: () => _confirmarExclusao(cat['id'], cat['nome']),
+                                                title: Text(cat['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
+                                                trailing: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    IconButton(
+                                                      icon: const Icon(Icons.edit, color: Colors.blue),
+                                                      tooltip: 'Editar',
+                                                      onPressed: () => _abrirModalCategoria(categoria: cat),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                                      tooltip: 'Excluir',
+                                                      onPressed: () => _confirmarExclusao(cat['id'], cat['nome']),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
+                                              ),
                                             ),
                                           );
                                         },

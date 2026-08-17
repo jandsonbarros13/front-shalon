@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:html' as html; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:acaiteria_front/core/constants/api_constants.dart';
 import 'package:acaiteria_front/features/auth/services/vendas_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -22,6 +24,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
   
   List<dynamic> _vendas = [];
   List<dynamic> _vendasFiltradas = [];
+  Map<String, dynamic>? _empresaData;
   
   bool _loading = true;
   int _paginaAtual = 1;
@@ -39,7 +42,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
 
   final List<String> _textosMascote = [
     "Bem-vindo ao seu Histórico de Vendas! Aqui em cima, você pode digitar o número do cupom ou o nome do cliente para achar uma venda rapidamente.",
-    "Nesta lista ficam as vendas de balcão. Clique na venda para ver os detalhes e nos três pontinhos para enviar via WhatsApp, E-mail, Reimprimir ou Cancelar!"
+    "Nesta lista ficam as vendas de balcão. Clique na venda para ver os detalhes e nos três pontinhos para enviar via WhatsApp, E-mail ou Reimprimir!"
   ];
 
   bool get isDark => _isDarkMode;
@@ -49,10 +52,18 @@ class _MinhasVendasState extends State<MinhasVendas> {
   Color get textColor => isDark ? Colors.white : Colors.black87;
   Color get textSecColor => isDark ? Colors.white54 : Colors.grey[600]!;
 
+  String get _baseUrl {
+    String url = ApiConstants.baseUrl.trim();
+    if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+    if (url.endsWith('/api')) url = url.substring(0, url.length - 4);
+    return url;
+  }
+
   @override
   void initState() {
     super.initState();
     _flutterTts.setLanguage("pt-BR");
+    _carregarEmpresa();
     _carregarVendas();
   }
 
@@ -61,6 +72,17 @@ class _MinhasVendasState extends State<MinhasVendas> {
     _buscaController.dispose();
     _flutterTts.stop();
     super.dispose();
+  }
+
+  Future<void> _carregarEmpresa() async {
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/api/empresa'));
+      if (response.statusCode == 200) {
+        setState(() {
+          _empresaData = jsonDecode(response.body);
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _carregarVendas({bool carregarMais = false}) async {
@@ -182,7 +204,8 @@ class _MinhasVendasState extends State<MinhasVendas> {
     if (!telLimpo.startsWith('55') && telLimpo.length >= 10) telLimpo = '55$telLimpo';
     
     final total = double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0;
-    final msg = 'Olá! Agradecemos sua compra na *Açaiteria Shalom*.\n\nSeu pedido *#${v['id']}* no valor de *R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}* foi finalizado com sucesso! 🍇\n\nVolte sempre!';
+    final nomeEmpresa = _empresaData?['nome_empresa'] ?? 'Açaiteria';
+    final msg = 'Olá! Agradecemos sua compra na *$nomeEmpresa*.\n\nSua venda/pedido *#${v['id']}* no valor de *R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}* foi registrado com sucesso! 🍇\n\nVolte sempre!';
     
     final url = 'https://api.whatsapp.com/send?phone=$telLimpo&text=${Uri.encodeComponent(msg)}';
     html.window.open(url, '_blank');
@@ -195,7 +218,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
       builder: (ctx) => AlertDialog(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Enviar via E-mail', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+        title: const Text('Enviar Recibo por E-mail', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
@@ -213,7 +236,7 @@ class _MinhasVendasState extends State<MinhasVendas> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () {
               Navigator.pop(ctx);
-              _enviarEmail(emailController.text, v);
+              _enviarEmailBackend(emailController.text, v);
             },
             child: const Text('Enviar E-mail', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -222,15 +245,55 @@ class _MinhasVendasState extends State<MinhasVendas> {
     );
   }
 
-  void _enviarEmail(String email, Map<String, dynamic> v) {
-    if (email.trim().isEmpty) return;
-    
-    final total = double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0;
-    final subject = 'Comprovante de Compra - Açaiteria Shalom #${v['id']}';
-    final body = 'Olá!\n\nAgradecemos sua compra na Açaiteria Shalom.\nSeu pedido #${v['id']} no valor de R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')} foi registrado com sucesso.\n\nVolte sempre! 🍇';
-    
-    final url = 'mailto:$email?subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
-    html.window.open(url, '_blank');
+  Future<void> _enviarEmailBackend(String emailDestino, Map<String, dynamic> v) async {
+    if (emailDestino.trim().isEmpty) return;
+
+    try {
+      String urlLogo = _empresaData?['logo_url']?.toString() ?? "";
+
+      List<Map<String, dynamic>> itensEmail = [];
+      final itens = v['itens'] ?? v['items'] as List? ?? [];
+      for (var item in itens) {
+        itensEmail.add({
+          'nome': item['nome'] ?? item['product_name'] ?? 'Item',
+          'quantidade': double.tryParse((item['quantidade'] ?? item['quantity'] ?? 0).toString()) ?? 0.0,
+          'preco': double.tryParse((item['subtotal'] ?? item['price'] ?? 0).toString()) ?? 0.0,
+          'observacao': '',
+          'adicionais': [],
+        });
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/pedidos/email'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'cliente_nome': v['cliente_nome'] ?? 'Consumidor Final',
+          'cliente_telefone': v['cliente_telefone'] ?? '',
+          'endereco_entrega': 'Venda de Balcão / PDV',
+          'forma_pagamento': _formatarFormaPagamento(v['forma_pagamento'] ?? ''),
+          'valor_total': double.tryParse((v['valor_total'] ?? 0).toString()) ?? 0.0,
+          'email_destino': emailDestino,
+          'logo_url': urlLogo,
+          'itens': itensEmail,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('E-mail enviado com sucesso! 🚀'), backgroundColor: Colors.green),
+          );
+        }
+      } else {
+        throw Exception('Erro');
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao enviar e-mail.'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _confirmarCancelarVenda(int id) {
@@ -455,6 +518,10 @@ class _MinhasVendasState extends State<MinhasVendas> {
     final formaPgto = _formatarFormaPagamento(v['forma_pagamento'] ?? '');
     final itens = v['itens'] ?? v['items'] as List? ?? [];
 
+    String nomeEmpresa = _empresaData?['nome_empresa'] ?? 'AÇAITERIA';
+    String telEmpresa = _empresaData?['whatsapp'] ?? '';
+    if (telEmpresa.isEmpty) telEmpresa = '(85) 99999-9999';
+
     pw.ImageProvider? logoImage;
     try {
       final ByteData bytes = await rootBundle.load('assets/images/logo.jpg');
@@ -475,7 +542,8 @@ class _MinhasVendasState extends State<MinhasVendas> {
                     : pw.SizedBox.shrink(),
               ),
               pw.SizedBox(height: 4),
-              pw.Center(child: pw.Text('AÇAITERIA SHALOM', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))),
+              pw.Center(child: pw.Text(nomeEmpresa.toUpperCase(), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold))),
+              pw.Center(child: pw.Text('WhatsApp: $telEmpresa', style: const pw.TextStyle(fontSize: 9))),
               pw.Center(child: pw.Text('REIMPRESSÃO DE CUPOM PDV', style: const pw.TextStyle(fontSize: 8, decoration: pw.TextDecoration.underline))),
               pw.SizedBox(height: 6),
               pw.Text('CUPOM DOC #$id', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
@@ -811,32 +879,49 @@ class _MinhasVendasState extends State<MinhasVendas> {
                                                   ],
                                                 ),
                                                 
-                                                Container(
-                                                  decoration: BoxDecoration(
-                                                    color: cardColor,
-                                                    border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  child: PopupMenuButton<String>(
-                                                    icon: Icon(Icons.more_vert, color: accentColor),
-                                                    tooltip: 'Ações da Venda',
-                                                    color: cardColor,
-                                                    offset: const Offset(0, 40),
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                    onSelected: (valor) {
-                                                      if (valor == 'wpp') _dialogWhatsApp(v);
-                                                      if (valor == 'email') _dialogEmail(v);
-                                                      if (valor == 'print') _reimprimirCupomPdf(v);
-                                                      if (valor == 'cancel') _confirmarCancelarVenda(id);
-                                                    },
-                                                    itemBuilder: (context) => [
-                                                      PopupMenuItem(value: 'wpp', child: Row(children: [const Icon(Icons.message, color: Colors.green), const SizedBox(width: 12), Text('WhatsApp', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
-                                                      PopupMenuItem(value: 'email', child: Row(children: [const Icon(Icons.email, color: Colors.blue), const SizedBox(width: 12), Text('E-mail', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
-                                                      PopupMenuItem(value: 'print', child: Row(children: [Icon(Icons.print, color: textColor), const SizedBox(width: 12), Text('Reimprimir', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
-                                                      if (statusFormatado != 'Cancelado')
-                                                        PopupMenuItem(value: 'cancel', child: Row(children: [const Icon(Icons.cancel, color: Colors.red), const SizedBox(width: 12), Text('Cancelar', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold))])),
-                                                    ],
-                                                  ),
+                                                Row(
+                                                  children: [
+                                                    if (statusFormatado != 'Cancelado')
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(right: 8.0),
+                                                        child: ElevatedButton.icon(
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: Colors.redAccent,
+                                                            foregroundColor: Colors.white,
+                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                            elevation: 0,
+                                                          ),
+                                                          onPressed: () => _confirmarCancelarVenda(id),
+                                                          icon: const Icon(Icons.cancel, size: 16),
+                                                          label: const Text('Cancelar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                        ),
+                                                      ),
+                                                    Container(
+                                                      decoration: BoxDecoration(
+                                                        color: cardColor,
+                                                        border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: PopupMenuButton<String>(
+                                                        icon: Icon(Icons.more_vert, color: accentColor),
+                                                        tooltip: 'Ações da Venda',
+                                                        color: cardColor,
+                                                        offset: const Offset(0, 40),
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                        onSelected: (valor) {
+                                                          if (valor == 'wpp') _dialogWhatsApp(v);
+                                                          if (valor == 'email') _dialogEmail(v);
+                                                          if (valor == 'print') _reimprimirCupomPdf(v);
+                                                        },
+                                                        itemBuilder: (context) => [
+                                                          PopupMenuItem(value: 'wpp', child: Row(children: [const Icon(Icons.message, color: Colors.green), const SizedBox(width: 12), Text('WhatsApp', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                          PopupMenuItem(value: 'email', child: Row(children: [const Icon(Icons.email, color: Colors.blue), const SizedBox(width: 12), Text('E-mail', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                          PopupMenuItem(value: 'print', child: Row(children: [Icon(Icons.print, color: textColor), const SizedBox(width: 12), Text('Reimprimir', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))])),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),

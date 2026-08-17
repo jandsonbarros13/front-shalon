@@ -8,20 +8,16 @@ class CategoriaService {
     'Accept': 'application/json',
   };
 
-  // Buscar todas as categorias
   Future<List<dynamic>> listarCategorias() async {
     try {
       final response = await http.get(Uri.parse(ApiConstants.categorias), headers: _headers);
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
-    } catch (e) {
-      print('Erro ao listar categorias: $e');
-    }
+    } catch (_) {}
     return [];
   }
 
-  // Cadastrar nova categoria
   Future<bool> cadastrarCategoria(String nome) async {
     try {
       final response = await http.post(
@@ -34,7 +30,6 @@ class CategoriaService {
     return false;
   }
 
-  // Editar categoria existente
   Future<bool> editarCategoria(int id, String nome) async {
     try {
       final response = await http.put(
@@ -47,7 +42,6 @@ class CategoriaService {
     return false;
   }
 
-  // Deletar categoria
   Future<bool> deletarCategoria(int id) async {
     try {
       final response = await http.delete(
@@ -55,6 +49,18 @@ class CategoriaService {
         headers: _headers,
       );
       return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> atualizarOrdem(List<int> ids) async {
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.categorias}/ordem'),
+        headers: _headers,
+        body: jsonEncode({'ids': ids}),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (_) {}
     return false;
   }

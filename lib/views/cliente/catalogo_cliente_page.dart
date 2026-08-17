@@ -70,6 +70,18 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
     }
   }
 
+  String _normalizarTexto(String texto) {
+    return texto
+        .toLowerCase()
+        .replaceAll('ç', 'c')
+        .replaceAll(RegExp(r'[áàãâ]'), 'a')
+        .replaceAll(RegExp(r'[éê]'), 'e')
+        .replaceAll('í', 'i')
+        .replaceAll(RegExp(r'[óõô]'), 'o')
+        .replaceAll('ú', 'u')
+        .trim();
+  }
+
   Future<void> _carregarCatalogo() async {
     try {
       String urlBaseLimpa = ApiConstants.baseUrl.trim();
@@ -86,6 +98,21 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
       if (response.statusCode == 200) {
         _catalogo = jsonDecode(response.body);
           
+        List<String> ordemDoBanco = [];
+        try {
+          final resCat = await http.get(Uri.parse('$urlBaseLimpa/api/categorias'));
+          if (resCat.statusCode == 200) {
+            List<dynamic> dataCat = jsonDecode(resCat.body);
+            for (var c in dataCat) {
+              String n = (c['nome'] ?? '').toString().trim();
+              if (n.isNotEmpty) {
+                n = n[0].toUpperCase() + n.substring(1);
+                ordemDoBanco.add(n);
+              }
+            }
+          }
+        } catch (_) {}
+
         Set<String> categoriasEncontradas = {};
         if (_catalogo!['produtos'] != null) {
           for (var p in _catalogo!['produtos']) {
@@ -97,7 +124,22 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           }
         }
           
-        List<String> listaOrdenada = categoriasEncontradas.toList()..sort();
+        List<String> listaOrdenada = [];
+        for (String cBanco in ordemDoBanco) {
+          String cBancoNorm = _normalizarTexto(cBanco);
+          String? match = categoriasEncontradas.cast<String?>().firstWhere(
+            (c) => c != null && _normalizarTexto(c) == cBancoNorm, 
+            orElse: () => null
+          );
+          if (match != null) {
+            listaOrdenada.add(match);
+            categoriasEncontradas.remove(match);
+          }
+        }
+        
+        List<String> restantes = categoriasEncontradas.toList()..sort();
+        listaOrdenada.addAll(restantes);
+
         _abasFiltro = ['Tudo', ...listaOrdenada];
 
         try {
@@ -153,6 +195,39 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<String?> _obterSugestaoIA(String produtoNome, List<dynamic> cremes, List<dynamic> adicionais) async {
+    try {
+      List<String> opcoesNomes = [];
+      for (var c in cremes) {
+        if (c['name'] != null) opcoesNomes.add(c['name'].toString());
+      }
+      for (var a in adicionais) {
+        if (a['name'] != null) opcoesNomes.add(a['name'].toString());
+      }
+
+      if (opcoesNomes.isEmpty) return null;
+
+      String urlBaseLimpa = ApiConstants.baseUrl.trim();
+      if (urlBaseLimpa.endsWith('/')) urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 1);
+      if (urlBaseLimpa.endsWith('/api')) urlBaseLimpa = urlBaseLimpa.substring(0, urlBaseLimpa.length - 4);
+
+      final res = await http.post(
+        Uri.parse('$urlBaseLimpa/api/ia/recomendacao'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'produto_nome': produtoNome,
+          'opcoes': opcoesNomes,
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final dados = jsonDecode(res.body);
+        return dados['sugestao'];
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _atualizarCarrinho(int id, double quantidade, String obs, List<int> adicionaisIds, List<int> cremesIds, {double? precoPromocional}) {
@@ -211,6 +286,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           carrinho: _carrinho,
           observacoes: _observacoes,
           adicionaisEscolhidos: _adicionaisEscolhidosPorItem,
+          cremesEscolhidos: _cremesEscolhidosPorItem,
         ),
       ),
     );
@@ -365,18 +441,6 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         const SnackBar(content: Text('Não foi possível abrir o WhatsApp.')),
       );
     }
-  }
-
-  String _normalizarTexto(String texto) {
-    return texto
-        .toLowerCase()
-        .replaceAll('ç', 'c')
-        .replaceAll(RegExp(r'[áàãâ]'), 'a')
-        .replaceAll(RegExp(r'[éê]'), 'e')
-        .replaceAll('í', 'i')
-        .replaceAll(RegExp(r'[óõô]'), 'o')
-        .replaceAll('ú', 'u')
-        .trim();
   }
 
   List<dynamic> _filtrarProdutos() {
@@ -853,7 +917,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                   const SizedBox(height: 16),
                 ],
               );
-            }
+            } 
 
             Widget buildConteudoModal() {
               return Column(
@@ -918,6 +982,52 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                               child: Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
                             ),
                           
+                          FutureBuilder<String?>(
+                            future: _obterSugestaoIA(p['name'] ?? '', cremesDoProduto, adicionaisDoProduto),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: corTema)),
+                                      const SizedBox(width: 8),
+                                      Text('Consultando combinação ideal com IA...', style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic)),
+                                    ],
+                                  ),
+                                );
+                              }
+                              if (snapshot.hasData && snapshot.data != null && snapshot.data!.trim().isNotEmpty) {
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 10),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: corTema.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: corTema.withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.auto_awesome, color: corTema, size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          snapshot.data!,
+                                          style: TextStyle(
+                                            color: corTema,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+
                           if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
                             const SizedBox(height: 8),
                             

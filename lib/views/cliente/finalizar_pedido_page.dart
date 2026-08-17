@@ -37,6 +37,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   
   final _nomeController = TextEditingController();
   final _telefoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _cepController = TextEditingController();
   final _ruaController = TextEditingController();
   final _numeroController = TextEditingController();
@@ -70,6 +71,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   void dispose() {
     _nomeController.dispose();
     _telefoneController.dispose();
+    _emailController.dispose();
     _cepController.dispose();
     _ruaController.dispose();
     _numeroController.dispose();
@@ -93,6 +95,42 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     if (url.endsWith('/')) url = url.substring(0, url.length - 1);
     if (url.endsWith('/api')) url = url.substring(0, url.length - 4);
     return url;
+  }
+
+  Future<void> _dispararEmailNotificacao(List<Map<String, dynamic>> itensDb) async {
+    try {
+      String urlLogo = widget.catalogo['logo_url']?.toString() ?? "";
+
+      String enderecoCompleto = _tipoEntrega == 'Entrega'
+          ? '${_ruaController.text.trim()}, nº ${_numeroController.text.trim()} - ${_bairroSelecionado ?? ''} (Ref: ${_referenciaController.text.trim()})'
+          : 'Retirada na Loja';
+
+      List<Map<String, dynamic>> itensEmail = [];
+      for (var item in itensDb) {
+        itensEmail.add({
+          'nome': item['nome'],
+          'quantidade': item['quantidade'],
+          'preco': item['subtotal'],
+          'observacao': '',
+          'adicionais': [],
+        });
+      }
+
+      await http.post(
+        Uri.parse('$_baseUrl/api/pedidos/email'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'cliente_nome': _nomeController.text.trim(),
+          'cliente_telefone': _telefoneController.text.trim(),
+          'endereco_entrega': enderecoCompleto,
+          'forma_pagamento': _formaPagamento,
+          'valor_total': _valorTotalComFrete,
+          'email_destino': _emailController.text.trim(),
+          'logo_url': urlLogo,
+          'itens': itensEmail,
+        }),
+      );
+    } catch (_) {}
   }
 
   Future<void> _validarCupom() async {
@@ -163,6 +201,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     setState(() {
       _nomeController.text = prefs.getString('cache_nome') ?? '';
       _telefoneController.text = prefs.getString('cache_telefone') ?? '';
+      _emailController.text = prefs.getString('cache_email') ?? '';
       _cepController.text = prefs.getString('cache_cep') ?? '';
       _ruaController.text = prefs.getString('cache_rua') ?? '';
       _numeroController.text = prefs.getString('cache_numero') ?? '';
@@ -181,6 +220,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cache_nome', _nomeController.text.trim());
     await prefs.setString('cache_telefone', _telefoneController.text.trim());
+    await prefs.setString('cache_email', _emailController.text.trim());
     await prefs.setString('cache_cep', _cepController.text.trim());
     await prefs.setString('cache_rua', _ruaController.text.trim());
     await prefs.setString('cache_numero', _numeroController.text.trim());
@@ -207,9 +247,8 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
 
   Future<void> _buscarCep(String cep) async {
     String cepLimpo = cep.replaceAll(RegExp(r'\D'), '');
-    if (cepLimpo.length != 8) {
-      return;
-    }
+    if (cepLimpo.length != 8) return;
+
     setState(() => _isCarregandoCep = true);
     try {
       final url = Uri.parse('https://viacep.com.br/ws/$cepLimpo/json/');
@@ -268,7 +307,7 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
           await _salvarDadosCache();
         }
       }
-    } catch (e) {
+    } catch (_) {
     } finally {
       setState(() => _isCarregandoLocalizacao = false);
     }
@@ -375,28 +414,44 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   }
 
   Future<void> _gerarPdfRecibo(int idPedido) async {
-    String base64Logo = "";
-    try {
-      final ByteData bytes = await rootBundle.load('assets/images/logo.jpg');
-      base64Logo = base64Encode(bytes.buffer.asUint8List());
-    } catch (_) {}
+    String base64Logo = widget.catalogo['logo_url']?.toString() ?? "";
+    
+    if (base64Logo.isEmpty) {
+      try {
+        final ByteData bytes = await rootBundle.load('assets/images/logo.jpg');
+        base64Logo = 'data:image/jpeg;base64,${base64Encode(bytes.buffer.asUint8List())}';
+      } catch (_) {}
+    }
 
     String logoHtml = base64Logo.isNotEmpty 
-        ? '<img src="data:image/jpeg;base64,$base64Logo" class="logo">' 
+        ? '<img src="$base64Logo" class="logo">' 
         : '';
+        
+    String nomeEmpresa = widget.catalogo['nome_empresa']?.toString() ?? widget.catalogo['nome']?.toString() ?? 'AÇAITERIA';
+    String telEmpresa = '';
+    
+    if (widget.catalogo['telefone'] != null && widget.catalogo['telefone'].toString().trim().isNotEmpty) {
+      telEmpresa = widget.catalogo['telefone'].toString().trim();
+    } else if (widget.catalogo['whatsapp'] != null && widget.catalogo['whatsapp'].toString().trim().isNotEmpty) {
+      telEmpresa = widget.catalogo['whatsapp'].toString().trim();
+    }
+    
+    if (telEmpresa.isEmpty || telEmpresa.toLowerCase() == 'null') {
+      telEmpresa = '(85) 99999-9999';
+    }
 
     String htmlContent = '''
     <!DOCTYPE html>
     <html lang="pt-BR">
     <head>
       <meta charset="UTF-8">
-      <title>Recibo #$idPedido - Açaiteria Shalom</title>
+      <title>Recibo #$idPedido - $nomeEmpresa</title>
       <style>
         body { font-family: 'Courier New', Courier, monospace; max-width: 380px; margin: 0 auto; padding: 20px; color: #000; background: #fff;}
         .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 15px; margin-bottom: 15px; }
         .header h2 { margin: 10px 0 5px 0; font-size: 20px; font-weight: bold; }
         .header p { margin: 3px 0; font-size: 13px; color: #222; }
-        .logo { width: 75px; height: 75px; border-radius: 50%; object-fit: cover; filter: grayscale(100%); margin-bottom: 5px; }
+        .logo { width: 75px; height: 75px; border-radius: 50%; object-fit: cover; margin-bottom: 5px; }
         .info { margin-bottom: 20px; font-size: 14px; line-height: 1.6; border-bottom: 1px dashed #000; padding-bottom: 15px;}
         .item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: bold;}
         .obs { font-size: 12px; color: #444; margin-bottom: 12px; padding-left: 10px; font-style: italic;}
@@ -411,11 +466,8 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
     <body onload="window.print()">
       <div class="header">
         $logoHtml
-        <h2>AÇAITERIA SHALOM</h2>
-        <p>Rua Josias Gondim - 711</p>
-        <p>Santa Clara, Canindé - CE</p>
-        <p>WhatsApp: (85) 99999-9999</p>
-        <p>Insta: @acaiteriashalom2026</p>
+        <h2>${nomeEmpresa.toUpperCase()}</h2>
+        <p>WhatsApp: $telEmpresa</p>
       </div>
 
       <div class="info">
@@ -455,7 +507,6 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
       <div class="footer">
         <b>Obrigado pela preferência!</b><br><br>
         Acesse nosso app para pedir novamente.<br>
-        <i>Desenvolvido por Pedro Barros</i>
       </div>
     </body>
     </html>
@@ -467,9 +518,28 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
   }
 
   void _enviarWhatsApp(int idPedido) {
-    String numeroDestino = '5585999999999';
-    String mensagem = 'Olá! Gostaria de acompanhar meu pedido *#$idPedido* feito pelo aplicativo.\n\nNome: ${_nomeController.text.trim()}';
+    String tel = '';
+    
+    if (widget.catalogo['telefone'] != null && widget.catalogo['telefone'].toString().trim().isNotEmpty) {
+      tel = widget.catalogo['telefone'].toString().trim();
+    } else if (widget.catalogo['whatsapp'] != null && widget.catalogo['whatsapp'].toString().trim().isNotEmpty) {
+      tel = widget.catalogo['whatsapp'].toString().trim();
+    }
+    
+    if (tel.isEmpty || tel.toLowerCase() == 'null') {
+      tel = '85999999999'; 
+    }
+
+    String numeroDestino = tel.replaceAll(RegExp(r'\D'), '');
+    
+    if (!numeroDestino.startsWith('55') && numeroDestino.isNotEmpty) {
+      numeroDestino = '55$numeroDestino';
+    }
+
+    String nomeEmpresa = widget.catalogo['nome_empresa']?.toString() ?? widget.catalogo['nome']?.toString() ?? 'Açaiteria';
+    String mensagem = 'Olá, $nomeEmpresa! Gostaria de acompanhar meu pedido *#$idPedido* feito pelo aplicativo.\n\nNome: ${_nomeController.text.trim()}';
     String urlSmart = 'https://wa.me/$numeroDestino?text=${Uri.encodeComponent(mensagem)}';
+    
     html.window.open(urlSmart, '_blank');
   }
 
@@ -659,6 +729,9 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
 
     if (resultado['success'] == true) {
       int idPedidoBanco = resultado['pedido_id'] ?? 0;
+      
+      _dispararEmailNotificacao(itensDb);
+
       _mostrarModalSucesso(idPedidoBanco, corTema);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -770,6 +843,16 @@ class _FinalizarPedidoPageState extends State<FinalizarPedidoPage> {
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(labelText: 'Telefone / WhatsApp', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
               validator: (v) => v!.isEmpty ? 'Por favor, digite seu telefone' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailController,
+              onChanged: (_) => _salvarDadosCache(),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Seu E-mail (Opcional - Para receber o recibo)', 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))
+              ),
             ),
             const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Divider()),
             
