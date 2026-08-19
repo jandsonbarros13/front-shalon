@@ -930,15 +930,15 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                       Expanded(child: Text(p['name'] ?? '', style: TextStyle(fontWeight: FontWeight.w900, fontSize: isMobile ? 22 : 32, color: corTema, height: 1.1))),
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.grey, size: 28), 
-                        onPressed: () => Navigator.pop(context), 
-                        padding: EdgeInsets.zero, 
+                        icon: const Icon(Icons.close, color: Colors.grey, size: 28),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
                         constraints: const BoxConstraints()
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  
+
                   if (precoPromocionalOverride != null)
                     Row(
                       children: [
@@ -953,7 +953,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                     )
                   else
                     Text('Venda por: ${un.toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 14)),
-                  
+
                   const SizedBox(height: 12),
                   Expanded(
                     child: RawScrollbar(
@@ -981,7 +981,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                               padding: const EdgeInsets.only(bottom: 8.0),
                               child: Text(p['description'] ?? '', style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
                             ),
-                          
+
                           FutureBuilder<String?>(
                             future: _obterSugestaoIA(p['name'] ?? '', cremesDoProduto, adicionaisDoProduto),
                             builder: (context, snapshot) {
@@ -1028,15 +1028,14 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                             },
                           ),
 
-                          if (categoria == 'Açai' || categoria == 'Cremes' || categoria == 'Combos' || categoria == 'Combo') ...[
-                            const SizedBox(height: 8),
-                            
-                            if (cremesDoProduto.isNotEmpty)
-                              buildListaExtras('ESCOLHA SEUS CREMES', Icons.icecream_outlined, cremesDoProduto, cremesSelecionadosLocais, maxCremesGratuitos),
-                            
-                            if (adicionaisDoProduto.isNotEmpty)
-                              buildListaExtras('ADICIONAIS E RECHEIOS', Icons.add_circle_outline, adicionaisDoProduto, adicionaisSelecionadosLocais, maxAdicionaisGratuitos),
-                          ],
+                          const SizedBox(height: 8),
+
+                          if (cremesDoProduto.isNotEmpty)
+                            buildListaExtras('ESCOLHA SEUS CREMES', Icons.icecream_outlined, cremesDoProduto, cremesSelecionadosLocais, maxCremesGratuitos),
+
+                          if (adicionaisDoProduto.isNotEmpty)
+                            buildListaExtras('ADICIONAIS E RECHEIOS', Icons.add_circle_outline, adicionaisDoProduto, adicionaisSelecionadosLocais, maxAdicionaisGratuitos),
+                          
                           const SizedBox(height: 12),
                           const Text('OBSERVAÇÕES (OPCIONAL):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87)),
                           const SizedBox(height: 8),
@@ -1128,7 +1127,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                   ),
                 ],
               );
-            } 
+            }
 
             return Container(
               color: Colors.white,

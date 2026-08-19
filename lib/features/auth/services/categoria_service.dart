@@ -18,24 +18,26 @@ class CategoriaService {
     return [];
   }
 
-  Future<bool> cadastrarCategoria(String nome) async {
+  // AGORA RECEBE O PARÂMETRO 'permiteAdicionais'
+  Future<bool> cadastrarCategoria(String nome, bool permiteAdicionais) async {
     try {
       final response = await http.post(
         Uri.parse(ApiConstants.categorias),
         headers: _headers,
-        body: jsonEncode({'nome': nome.trim()}),
+        body: jsonEncode({'nome': nome.trim(), 'permite_adicionais': permiteAdicionais}),
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (_) {}
     return false;
   }
 
-  Future<bool> editarCategoria(int id, String nome) async {
+  // AGORA RECEBE O PARÂMETRO 'permiteAdicionais'
+  Future<bool> editarCategoria(int id, String nome, bool permiteAdicionais) async {
     try {
       final response = await http.put(
         Uri.parse('${ApiConstants.categorias}/$id'),
         headers: _headers,
-        body: jsonEncode({'nome': nome.trim()}),
+        body: jsonEncode({'nome': nome.trim(), 'permite_adicionais': permiteAdicionais}),
       );
       return response.statusCode == 200;
     } catch (_) {}

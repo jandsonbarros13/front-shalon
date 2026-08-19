@@ -261,67 +261,96 @@ class _CategoriasTabState extends State<CategoriasTab> {
 
   void _abrirModalCategoria({Map<String, dynamic>? categoria}) {
     final nomeController = TextEditingController(text: categoria != null ? categoria['nome'] : '');
+    bool permiteAdicionais = categoria != null ? (categoria['permite_adicionais'] ?? false) : false;
     final bool isEdicao = categoria != null;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          isEdicao ? 'Editar Categoria' : 'Nova Categoria',
-          style: TextStyle(fontWeight: FontWeight.w900, color: accentColor),
-        ),
-        content: TextField(
-          controller: nomeController,
-          style: TextStyle(color: textColor),
-          decoration: InputDecoration(
-            labelText: 'Nome da Categoria',
-            hintText: 'Ex: Sobremesas',
-            labelStyle: TextStyle(color: textSecColor),
-            hintStyle: TextStyle(color: textSecColor.withOpacity(0.5)),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
-            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentColor, width: 2), borderRadius: BorderRadius.circular(10)),
-          ),
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor, 
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+      builder: (context) => StatefulBuilder( // StatefulBuilder para atualizar o Switch dentro do Dialog
+        builder: (context, setStateModal) {
+          return AlertDialog(
+            backgroundColor: cardColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              isEdicao ? 'Editar Categoria' : 'Nova Categoria',
+              style: TextStyle(fontWeight: FontWeight.w900, color: accentColor),
             ),
-            onPressed: () async {
-              if (nomeController.text.trim().isEmpty) return;
-              
-              Navigator.pop(context);
-              setState(() => _isLoading = true);
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nomeController,
+                  style: TextStyle(color: textColor),
+                  decoration: InputDecoration(
+                    labelText: 'Nome da Categoria',
+                    hintText: 'Ex: Gelatos',
+                    labelStyle: TextStyle(color: textSecColor),
+                    hintStyle: TextStyle(color: textSecColor.withOpacity(0.5)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[300]!), borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentColor, width: 2), borderRadius: BorderRadius.circular(10)),
+                  ),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black12 : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isDark ? Colors.white24 : Colors.grey[300]!)
+                  ),
+                  child: SwitchListTile(
+                    title: Text('Permite Adicionais e Extras?', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('Ative se os produtos dessa categoria poderão ter complementos (ex: coberturas, ingredientes extras).', style: TextStyle(color: textSecColor, fontSize: 12)),
+                    value: permiteAdicionais,
+                    activeColor: accentColor,
+                    onChanged: (bool value) {
+                      setStateModal(() {
+                        permiteAdicionais = value;
+                      });
+                    },
+                  ),
+                )
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor, 
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                ),
+                onPressed: () async {
+                  if (nomeController.text.trim().isEmpty) return;
+                  
+                  Navigator.pop(context);
+                  setState(() => _isLoading = true);
 
-              bool sucesso;
-              if (isEdicao) {
-                sucesso = await _categoriaService.editarCategoria(categoria['id'], nomeController.text);
-              } else {
-                sucesso = await _categoriaService.cadastrarCategoria(nomeController.text);
-              }
+                  bool sucesso;
+                  if (isEdicao) {
+                    sucesso = await _categoriaService.editarCategoria(categoria['id'], nomeController.text, permiteAdicionais);
+                  } else {
+                    sucesso = await _categoriaService.cadastrarCategoria(nomeController.text, permiteAdicionais);
+                  }
 
-              if (sucesso) {
-                _carregarCategorias();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoria salva com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
-              } else {
-                setState(() => _isLoading = false);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar categoria.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
-              }
-            },
-            child: const Text('Salvar', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+                  if (sucesso) {
+                    _carregarCategorias();
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoria salva com sucesso!', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
+                  } else {
+                    setState(() => _isLoading = false);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erro ao salvar categoria.', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.redAccent));
+                  }
+                },
+                child: const Text('Salvar', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -490,6 +519,7 @@ class _CategoriasTabState extends State<CategoriasTab> {
                                         },
                                         itemBuilder: (context, index) {
                                           final cat = _categorias[index];
+                                          final bool permiteExtras = cat['permite_adicionais'] ?? false;
                                           return Container(
                                             key: ValueKey(cat['id']),
                                             decoration: BoxDecoration(
@@ -517,7 +547,23 @@ class _CategoriasTabState extends State<CategoriasTab> {
                                                     ),
                                                   ],
                                                 ),
-                                                title: Text(cat['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
+                                                title: Row(
+                                                  children: [
+                                                    Text(cat['nome'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
+                                                    if (permiteExtras) ...[
+                                                      const SizedBox(width: 8),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.green.withOpacity(0.2),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                          border: Border.all(color: Colors.green.withOpacity(0.5))
+                                                        ),
+                                                        child: const Text('Com Adicionais', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+                                                      )
+                                                    ]
+                                                  ],
+                                                ),
                                                 trailing: Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [

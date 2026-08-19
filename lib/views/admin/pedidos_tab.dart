@@ -355,6 +355,173 @@ class _PedidosTabState extends State<PedidosTab> {
     );
   }
 
+  // ==== NOVO MODAL INTELIGENTE DE VISUALIZAR O PEDIDO ====
+  void _dialogVisualizarPedido(Map<String, dynamic> p) {
+    final id = p['id'] ?? 0;
+    final cliente = p['cliente_nome'] ?? 'Cliente';
+    final fone = p['cliente_telefone'] ?? '';
+    final tipoEntrega = p['tipo_entrega'] ?? 'Não Informado';
+    final formaPgto = _formatarFormaPagamento(p['forma_pagamento'] ?? '');
+    final itens = p['itens'] as List? ?? [];
+    final total = double.tryParse((p['valor_total'] ?? 0).toString()) ?? 0.0;
+    final isEntrega = tipoEntrega == 'Entrega';
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.receipt_long, color: accentColor),
+            const SizedBox(width: 8),
+            Text('Resumo do Pedido #$id', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('CLIENTE: $cliente', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                if (fone.isNotEmpty) Text('TELEFONE: $fone', style: TextStyle(color: textColor)),
+                const SizedBox(height: 8),
+                Text('TIPO: $tipoEntrega', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                if (isEntrega) ...[
+                  Text('ENDEREÇO:', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                  Text('${p['endereco_rua']}, Nº ${p['endereco_numero']} - ${p['endereco_bairro']}', style: TextStyle(color: textColor)),
+                  if ((p['endereco_referencia'] ?? '').isNotEmpty)
+                    Text('REF: ${p['endereco_referencia']}', style: TextStyle(color: textColor)),
+                ],
+                const SizedBox(height: 8),
+                Text('PAGAMENTO: $formaPgto', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                if (p['forma_pagamento'] == 'Dinheiro' && (p['troco_para'] != null && p['troco_para'] > 0))
+                  Text('LEVAR TROCO PARA R\$: ${p['troco_para']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(),
+                ),
+                
+                Text('ITENS DO PEDIDO:', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 12),
+                
+                ...itens.map((item) {
+                  final String nomeCompleto = item['nome'] ?? 'ITEM';
+                  String mainName = nomeCompleto;
+                  List<String> cremes = [];
+                  List<String> adicionais = [];
+                  String obs = '';
+
+                  // Lógica de Inteligência para separar o texto
+                  // 1. Extrai Observação
+                  final obsMatch = RegExp(r'\(Obs:(.*?)\)').firstMatch(mainName);
+                  if (obsMatch != null) {
+                    obs = obsMatch.group(1)?.trim() ?? '';
+                    mainName = mainName.replaceAll(obsMatch.group(0)!, '').trim();
+                  }
+
+                  // 2. Extrai Cremes
+                  final cremesMatch = RegExp(r'\[(.*?)\]').firstMatch(mainName);
+                  if (cremesMatch != null) {
+                    String cText = cremesMatch.group(1)?.replaceAll('🍦 Cremes:', '').replaceAll('Cremes:', '').trim() ?? '';
+                    if (cText.isNotEmpty) {
+                      cremes = cText.split(',').map((e) => e.trim()).toList();
+                    }
+                    mainName = mainName.replaceAll(cremesMatch.group(0)!, '').trim();
+                  }
+
+                  // 3. Extrai Adicionais Extras
+                  final addMatch = RegExp(r'\(\+(.*?)\)').firstMatch(mainName);
+                  if (addMatch != null) {
+                    String aText = addMatch.group(1)?.trim() ?? '';
+                    if (aText.isNotEmpty) {
+                      adicionais = aText.split(',').map((e) => e.trim()).toList();
+                    }
+                    mainName = mainName.replaceAll(addMatch.group(0)!, '').trim();
+                  }
+                  
+                  final rawQtd = double.tryParse((item['quantidade'] ?? 1).toString()) ?? 1.0;
+                  final sub = double.tryParse((item['subtotal'] ?? 0).toString()) ?? 0.0;
+                  final un = (item['unidade'] ?? 'Unid').toString();
+                  String qtdTexto = un.toLowerCase() == 'kg' ? '${(rawQtd).toStringAsFixed(3)} kg' : '${rawQtd.toStringAsFixed(0)}x';
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: Text('$qtdTexto $mainName', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16))),
+                            Text('R\$ ${sub.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)),
+                          ]
+                        ),
+                        
+                        // Lista de Cremes
+                        if (cremes.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text('🍦 Cremes:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: cremes.map((c) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.orange.withOpacity(0.3))),
+                              child: Text(c, style: const TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                            )).toList(),
+                          ),
+                        ],
+                        
+                        // Lista de Adicionais
+                        if (adicionais.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('➕ Adicionais:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: adicionais.map((a) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.blue.withOpacity(0.3))),
+                              child: Text(a, style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
+                            )).toList(),
+                          ),
+                        ],
+
+                        // Observação
+                        if (obs.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('📝 Observação:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text(obs, style: TextStyle(color: textSecColor, fontSize: 13, fontStyle: FontStyle.italic)),
+                        ]
+                      ]
+                    )
+                  );
+                }),
+                const Divider(),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                        Text('TOTAL:', style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 18)),
+                        Text('R\$ ${total.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: accentColor, fontWeight: FontWeight.w900, fontSize: 18)),
+                    ]
+                )
+              ]
+            )
+          )
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar', style: TextStyle(fontWeight: FontWeight.bold))),
+        ]
+      )
+    );
+  }
+
   String _formatarFormaPagamento(String? forma) {
     if (forma == null || forma.isEmpty) return 'Não Especificada';
     switch (forma.toLowerCase()) {
@@ -888,8 +1055,24 @@ class _PedidosTabState extends State<PedidosTab> {
                                             ],
                                             const SizedBox(height: 16),
                                             Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
+                                            
+                                            // Renderização "Limpa" no card principal (Sem mostrar todos os cremes embolados)
                                             ...itens.map((item) {
-                                              final nomeItem = item['nome'] ?? 'ITEM';
+                                              final String nomeCompleto = item['nome'] ?? 'ITEM';
+                                              String mainName = nomeCompleto;
+                                              
+                                              // Remove [cremes] e (+adicionais) para exibir limpo no card principal
+                                              int bIdx = mainName.indexOf('[');
+                                              int pIdx = mainName.indexOf('(');
+                                              int minIdx = -1;
+                                              if (bIdx != -1 && pIdx != -1) minIdx = bIdx < pIdx ? bIdx : pIdx;
+                                              else if (bIdx != -1) minIdx = bIdx;
+                                              else if (pIdx != -1) minIdx = pIdx;
+
+                                              if (minIdx > 0) {
+                                                mainName = mainName.substring(0, minIdx).trim();
+                                              }
+
                                               final rawQtd = double.tryParse((item['quantidade'] ?? 1).toString()) ?? 1.0;
                                               final subtotalItem = double.tryParse((item['subtotal'] ?? 0).toString()) ?? 0.0;
                                               final unidade = (item['unidade'] ?? 'Unid').toString();
@@ -903,8 +1086,8 @@ class _PedidosTabState extends State<PedidosTab> {
                                                 child: Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Expanded(child: Text("$qtdTexto $nomeItem", style: TextStyle(fontWeight: FontWeight.bold, color: textColor))),
-                                                    Text("R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}", style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+                                                    Expanded(child: Text("$qtdTexto $mainName", style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 15))),
+                                                    Text("R\$ ${subtotalItem.toStringAsFixed(2).replaceAll('.', ',')}", style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 15)),
                                                   ],
                                                 ),
                                               );
@@ -967,6 +1150,22 @@ class _PedidosTabState extends State<PedidosTab> {
                                                           label: const Text('Cancelar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                                         ),
                                                       ),
+                                                      
+                                                    // BOTÃO "OLHINHO" (VISUALIZAR)
+                                                    Container(
+                                                      margin: const EdgeInsets.only(right: 8),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.blueAccent.withOpacity(0.1),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(color: Colors.blueAccent.withOpacity(0.5))
+                                                      ),
+                                                      child: IconButton(
+                                                        tooltip: 'Visualizar Pedido Completo',
+                                                        icon: const Icon(Icons.remove_red_eye, color: Colors.blueAccent),
+                                                        onPressed: () => _dialogVisualizarPedido(p),
+                                                      ),
+                                                    ),
+
                                                     Container(
                                                       decoration: BoxDecoration(
                                                         color: cardColor,
