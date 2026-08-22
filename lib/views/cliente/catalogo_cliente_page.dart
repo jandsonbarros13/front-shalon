@@ -82,6 +82,87 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         .trim();
   }
 
+  bool _checkInterval(int nowMinutes, RegExpMatch startMatch, RegExpMatch endMatch) {
+    int startHour = int.parse(startMatch.group(1)!);
+    int startMin = startMatch.group(2) != null ? int.parse(startMatch.group(2)!) : 0;
+    
+    int endHour = int.parse(endMatch.group(1)!);
+    int endMin = endMatch.group(2) != null ? int.parse(endMatch.group(2)!) : 0;
+    
+    int startMinutes = startHour * 60 + startMin;
+    int endMinutes = endHour * 60 + endMin;
+    
+    if (startMinutes <= endMinutes) {
+      return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    } else {
+      return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+    }
+  }
+
+  bool _isLojaAberta() {
+    if (_empresa == null || _empresa!['horario_funcionamento'] == null) return true;
+    String horario = _empresa!['horario_funcionamento'].toString().toLowerCase().trim();
+    if (horario.isEmpty) return true;
+
+    RegExp exp = RegExp(r'(\d{1,2})[:hH]?(\d{2})?');
+    List<RegExpMatch> matches = exp.allMatches(horario).toList();
+    
+    if (matches.isEmpty) return true;
+
+    DateTime now = DateTime.now();
+    int nowMinutes = now.hour * 60 + now.minute;
+
+    if (matches.length == 2) {
+      return _checkInterval(nowMinutes, matches[0], matches[1]);
+    } else if (matches.length >= 4) {
+      bool turno1 = _checkInterval(nowMinutes, matches[0], matches[1]);
+      bool turno2 = _checkInterval(nowMinutes, matches[2], matches[3]);
+      return turno1 || turno2;
+    }
+
+    return true; 
+  }
+
+  void _mostrarDialogLojaFechada() {
+    final String horario = _empresa?['horario_funcionamento'] ?? 'Horário não informado';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.access_time_filled, color: Colors.redAccent, size: 28),
+            SizedBox(width: 8),
+            Text('Estamos Fechados', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 20)),
+          ]
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('No momento não estamos aceitando pedidos.', style: TextStyle(fontSize: 16, color: Colors.black87)),
+            const SizedBox(height: 16),
+            const Text('Nosso horário de funcionamento é:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
+            const SizedBox(height: 4),
+            Text(horario, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black87)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendi', style: TextStyle(fontWeight: FontWeight.bold)),
+          )
+        ]
+      )
+    );
+  }
+
   Future<void> _carregarCatalogo() async {
     try {
       String urlBaseLimpa = ApiConstants.baseUrl.trim();
@@ -106,20 +187,30 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
             for (var c in dataCat) {
               String n = (c['nome'] ?? '').toString().trim();
               if (n.isNotEmpty) {
-                n = n[0].toUpperCase() + n.substring(1);
-                ordemDoBanco.add(n);
+                if (n.length > 1) {
+                  n = n[0].toUpperCase() + n.substring(1).toLowerCase();
+                } else {
+                  n = n.toUpperCase();
+                }
+                if (!ordemDoBanco.contains(n)) {
+                  ordemDoBanco.add(n);
+                }
               }
             }
           }
         } catch (_) {}
 
-        Set<String> categoriasEncontradas = {};
+        Map<String, String> categoriasUnicas = {};
         if (_catalogo!['produtos'] != null) {
           for (var p in _catalogo!['produtos']) {
             String cat = (p['category'] ?? p['Category'] ?? '').toString().trim();
             if (cat.isNotEmpty) {
-              cat = cat[0].toUpperCase() + cat.substring(1);
-              categoriasEncontradas.add(cat);
+              if (cat.length > 1) {
+                cat = cat[0].toUpperCase() + cat.substring(1).toLowerCase();
+              } else {
+                cat = cat.toUpperCase();
+              }
+              categoriasUnicas[_normalizarTexto(cat)] = cat;
             }
           }
         }
@@ -127,17 +218,13 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
         List<String> listaOrdenada = [];
         for (String cBanco in ordemDoBanco) {
           String cBancoNorm = _normalizarTexto(cBanco);
-          String? match = categoriasEncontradas.cast<String?>().firstWhere(
-            (c) => c != null && _normalizarTexto(c) == cBancoNorm, 
-            orElse: () => null
-          );
-          if (match != null) {
-            listaOrdenada.add(match);
-            categoriasEncontradas.remove(match);
+          if (categoriasUnicas.containsKey(cBancoNorm)) {
+            listaOrdenada.add(categoriasUnicas[cBancoNorm]!);
+            categoriasUnicas.remove(cBancoNorm);
           }
         }
         
-        List<String> restantes = categoriasEncontradas.toList()..sort();
+        List<String> restantes = categoriasUnicas.values.toList()..sort();
         listaOrdenada.addAll(restantes);
 
         _abasFiltro = ['Tudo', ...listaOrdenada];
@@ -220,11 +307,20 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
           'produto_nome': produtoNome,
           'opcoes': opcoesNomes,
         }),
-      );
+      ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         final dados = jsonDecode(res.body);
-        return dados['sugestao'];
+        final sugestao = dados['sugestao']?.toString() ?? '';
+        
+        if (sugestao.isEmpty || 
+            sugestao.toLowerCase().contains('error') || 
+            sugestao.toLowerCase().contains('exception') ||
+            sugestao.toLowerCase().contains('html') ||
+            sugestao.toLowerCase().contains('falha')) {
+          return null;
+        }
+        return sugestao;
       }
     } catch (_) {}
     return null;
@@ -267,6 +363,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
   }
 
   Future<void> _abrirCarrinho() async {
+    if (!_isLojaAberta()) {
+      _mostrarDialogLojaFechada();
+      return;
+    }
+
     if (_carrinho.isEmpty) return;
 
     Map<String, dynamic> catalogoModificado = jsonDecode(jsonEncode(_catalogo));
@@ -997,6 +1098,7 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                                   ),
                                 );
                               }
+                              if (snapshot.hasError) return const SizedBox.shrink();
                               if (snapshot.hasData && snapshot.data != null && snapshot.data!.trim().isNotEmpty) {
                                 return Container(
                                   margin: const EdgeInsets.symmetric(vertical: 10),
@@ -1106,6 +1208,11 @@ class _CatalogoClientePageState extends State<CatalogoClientePage> with SingleTi
                         elevation: 4
                       ),
                       onPressed: () {
+                        if (!_isLojaAberta()) {
+                          _mostrarDialogLojaFechada();
+                          return;
+                        }
+
                         double qtdFinal = isUnidadePeso ? (double.tryParse(pesoController.text) ?? 0.0) : quantidadeDesejada;
                         if (qtdFinal <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

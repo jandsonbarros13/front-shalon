@@ -355,7 +355,6 @@ class _PedidosTabState extends State<PedidosTab> {
     );
   }
 
-  // ==== NOVO MODAL INTELIGENTE DE VISUALIZAR O PEDIDO ====
   void _dialogVisualizarPedido(Map<String, dynamic> p) {
     final id = p['id'] ?? 0;
     final cliente = p['cliente_nome'] ?? 'Cliente';
@@ -415,15 +414,12 @@ class _PedidosTabState extends State<PedidosTab> {
                   List<String> adicionais = [];
                   String obs = '';
 
-                  // Lógica de Inteligência para separar o texto
-                  // 1. Extrai Observação
                   final obsMatch = RegExp(r'\(Obs:(.*?)\)').firstMatch(mainName);
                   if (obsMatch != null) {
                     obs = obsMatch.group(1)?.trim() ?? '';
                     mainName = mainName.replaceAll(obsMatch.group(0)!, '').trim();
                   }
 
-                  // 2. Extrai Cremes
                   final cremesMatch = RegExp(r'\[(.*?)\]').firstMatch(mainName);
                   if (cremesMatch != null) {
                     String cText = cremesMatch.group(1)?.replaceAll('🍦 Cremes:', '').replaceAll('Cremes:', '').trim() ?? '';
@@ -433,7 +429,6 @@ class _PedidosTabState extends State<PedidosTab> {
                     mainName = mainName.replaceAll(cremesMatch.group(0)!, '').trim();
                   }
 
-                  // 3. Extrai Adicionais Extras
                   final addMatch = RegExp(r'\(\+(.*?)\)').firstMatch(mainName);
                   if (addMatch != null) {
                     String aText = addMatch.group(1)?.trim() ?? '';
@@ -461,7 +456,6 @@ class _PedidosTabState extends State<PedidosTab> {
                           ]
                         ),
                         
-                        // Lista de Cremes
                         if (cremes.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Text('🍦 Cremes:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -477,7 +471,6 @@ class _PedidosTabState extends State<PedidosTab> {
                           ),
                         ],
                         
-                        // Lista de Adicionais
                         if (adicionais.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text('➕ Adicionais:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -493,7 +486,6 @@ class _PedidosTabState extends State<PedidosTab> {
                           ),
                         ],
 
-                        // Observação
                         if (obs.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text('📝 Observação:', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -817,6 +809,28 @@ class _PedidosTabState extends State<PedidosTab> {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'Pedido_$id.pdf');
   }
 
+  String formatarDataBrasil(String dataServidor) {
+    if (dataServidor.isEmpty || dataServidor == 'null') return '';
+    
+    try {
+      if (!dataServidor.endsWith('Z') && !dataServidor.contains('+') && !dataServidor.contains('-')) {
+        dataServidor += 'Z';
+      }
+      
+      DateTime dataUtc = DateTime.parse(dataServidor);
+      DateTime dataLocal = dataUtc.toLocal(); 
+      
+      String dia = dataLocal.day.toString().padLeft(2, '0');
+      String mes = dataLocal.month.toString().padLeft(2, '0');
+      String hora = dataLocal.hour.toString().padLeft(2, '0');
+      String minuto = dataLocal.minute.toString().padLeft(2, '0');
+      
+      return '$dia/$mes $hora:$minuto';
+    } catch (e) {
+      return dataServidor;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
@@ -965,7 +979,8 @@ class _PedidosTabState extends State<PedidosTab> {
                                 final p = _pedidosFiltrados[idx];
                                 final id = p['id'] ?? 0;
                                 final total = double.tryParse((p['valor_total'] ?? 0).toString()) ?? 0.0;
-                                final data = (p['data'] ?? '').toString();
+                                final dataOriginal = (p['data'] ?? '').toString();
+                                final dataFormatada = formatarDataBrasil(dataOriginal);
                                 final cliente = p['cliente_nome'] ?? 'Cliente';
                                 final formaPgto = _formatarFormaPagamento(p['forma_pagamento'] ?? '');
                                 final tipoEntrega = p['tipo_entrega'] ?? 'Não Informado';
@@ -1001,7 +1016,7 @@ class _PedidosTabState extends State<PedidosTab> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 6),
-                                        Text('Data: $data | Tipo: $tipoEntrega', style: TextStyle(color: textSecColor, fontSize: 13)),
+                                        Text('Data: $dataFormatada | Tipo: $tipoEntrega', style: TextStyle(color: textSecColor, fontSize: 13)),
                                         const SizedBox(height: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1027,19 +1042,29 @@ class _PedidosTabState extends State<PedidosTab> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Row(
+                                            Wrap(
+                                              spacing: 16,
+                                              runSpacing: 8,
+                                              crossAxisAlignment: WrapCrossAlignment.center,
                                               children: [
-                                                Icon(Icons.phone, size: 16, color: textSecColor),
-                                                const SizedBox(width: 8),
-                                                Text(p['cliente_telefone'] ?? '', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                                                const SizedBox(width: 24),
-                                                Icon(Icons.payment, size: 16, color: textSecColor),
-                                                const SizedBox(width: 8),
-                                                Text(formaPgto, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                                                if (p['forma_pagamento'] == 'Dinheiro' && (p['troco_para'] != null && p['troco_para'] > 0)) ...[
-                                                  const SizedBox(width: 16),
-                                                  Text('(Troco p/ R\$ ${p['troco_para']})', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
-                                                ]
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.phone, size: 16, color: textSecColor),
+                                                    const SizedBox(width: 8),
+                                                    Text(p['cliente_telefone'] ?? '', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.payment, size: 16, color: textSecColor),
+                                                    const SizedBox(width: 8),
+                                                    Text(formaPgto, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                if (p['forma_pagamento'] == 'Dinheiro' && (p['troco_para'] != null && p['troco_para'] > 0))
+                                                  Text('(Troco p/ R\$ ${p['troco_para']})', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
                                               ],
                                             ),
                                             if (isEntrega) ...[
@@ -1055,13 +1080,10 @@ class _PedidosTabState extends State<PedidosTab> {
                                             ],
                                             const SizedBox(height: 16),
                                             Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
-                                            
-                                            // Renderização "Limpa" no card principal (Sem mostrar todos os cremes embolados)
                                             ...itens.map((item) {
                                               final String nomeCompleto = item['nome'] ?? 'ITEM';
                                               String mainName = nomeCompleto;
                                               
-                                              // Remove [cremes] e (+adicionais) para exibir limpo no card principal
                                               int bIdx = mainName.indexOf('[');
                                               int pIdx = mainName.indexOf('(');
                                               int minIdx = -1;
@@ -1095,10 +1117,14 @@ class _PedidosTabState extends State<PedidosTab> {
                                             const SizedBox(height: 16),
                                             Divider(color: isDark ? Colors.white10 : Colors.grey[300]),
                                             const SizedBox(height: 8),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            Wrap(
+                                              alignment: WrapAlignment.spaceBetween,
+                                              crossAxisAlignment: WrapCrossAlignment.center,
+                                              spacing: 12,
+                                              runSpacing: 12,
                                               children: [
                                                 Row(
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
                                                     Text('Situação: ', style: TextStyle(fontWeight: FontWeight.bold, color: textSecColor)),
                                                     Container(
@@ -1132,28 +1158,26 @@ class _PedidosTabState extends State<PedidosTab> {
                                                   ],
                                                 ),
                                                 
-                                                Row(
+                                                Wrap(
+                                                  spacing: 8,
+                                                  runSpacing: 8,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
                                                   children: [
                                                     if (statusFormatado != 'Cancelado')
-                                                      Padding(
-                                                        padding: const EdgeInsets.only(right: 8.0),
-                                                        child: ElevatedButton.icon(
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor: Colors.redAccent,
-                                                            foregroundColor: Colors.white,
-                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                                            elevation: 0,
-                                                          ),
-                                                          onPressed: () => _confirmarCancelarPedido(id),
-                                                          icon: const Icon(Icons.cancel, size: 16),
-                                                          label: const Text('Cancelar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                      ElevatedButton.icon(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: Colors.redAccent,
+                                                          foregroundColor: Colors.white,
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                          elevation: 0,
                                                         ),
+                                                        onPressed: () => _confirmarCancelarPedido(id),
+                                                        icon: const Icon(Icons.cancel, size: 16),
+                                                        label: const Text('Cancelar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                                       ),
                                                       
-                                                    // BOTÃO "OLHINHO" (VISUALIZAR)
                                                     Container(
-                                                      margin: const EdgeInsets.only(right: 8),
                                                       decoration: BoxDecoration(
                                                         color: Colors.blueAccent.withOpacity(0.1),
                                                         borderRadius: BorderRadius.circular(8),

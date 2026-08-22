@@ -853,8 +853,14 @@ class _CaixaTabState extends State<CaixaTab> {
                           itemBuilder: (context, index) {
                             final item = _historicoCaixas[index];
                             final bool aberto = item['status'] == 'Aberto';
+                            
                             final double saldoInicial = double.tryParse(item['saldo_inicial']?.toString() ?? '0') ?? 0.0;
-                            final double saldoFinal = double.tryParse(item['saldo_final']?.toString() ?? '0') ?? 0.0;
+                            final double tDinheiro = double.tryParse(item['total_dinheiro']?.toString() ?? '0') ?? 0.0;
+                            final double tSup = double.tryParse(item['total_suprimento']?.toString() ?? '0') ?? 0.0;
+                            final double tSang = double.tryParse(item['total_sangria']?.toString() ?? '0') ?? 0.0;
+                            
+                            final double saldoFinal = saldoInicial + tDinheiro + tSup - tSang;
+
                             final String strAbertura = _formatarData(item['data_abertura']);
                             final String strFechamento = aberto ? 'Em andamento' : _formatarData(item['data_fechamento']);
 
